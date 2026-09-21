@@ -4,7 +4,7 @@ version = "1.7.0-dev"
 description = "Automatically bump semver, update changelogs, and open release PRs on merge."
 authors = [{ name = "Guy Erreich", email = "gerreich.dev@gmail.com" }]
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [

@@ -1,6 +1,6 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Public logging API for auto_semver."""
 
 from auto_semver.log.github import attach_github_adapter, is_github_actions

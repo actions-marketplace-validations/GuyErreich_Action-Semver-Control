@@ -1,11 +1,11 @@
 header:
   license:
-    spdx-id: MIT
+    spdx-id: GPL-3.0-or-later
     copyright-owner: Guy Erreich
     content: |
       Copyright (c) 2025-2026 Guy Erreich
 
-      SPDX-License-Identifier: MIT
+      SPDX-License-Identifier: GPL-3.0-or-later
   paths:
     - src
     - scripts
@@ -18,3 +18,5 @@ header:
     - '**/py.typed'
     - 'src/**/templates/**'
     - '.github/copilot/**'
+    - 'src/runview/**'
+    - '.github/CODEOWNERS'

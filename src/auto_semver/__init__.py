@@ -1,5 +1,5 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 __version__ = "0.1.0"
 __author__ = "Guy Erreich"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Validate GitHub App installation tokens against the stateless format rollout.
 
 Mints an installation access token with the temporary override header

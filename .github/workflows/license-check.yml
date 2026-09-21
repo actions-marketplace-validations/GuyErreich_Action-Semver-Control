@@ -1,6 +1,6 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 name: License Header Check
 
 on:
@@ -27,10 +27,22 @@ jobs:
 
       # Docker avoids nested unpinned actions inside apache/skywalking-eyes (e.g. setup-go@v5)
       # which fail when the repo requires full-length commit SHA pins.
-      - name: Check license headers
+      - name: Check license headers (GPL-3.0-or-later)
         run: |
           docker run --rm \
             -v "$PWD:/github/workspace" \
             -w /github/workspace \
             apache/skywalking-eyes:0.8.0 \
             header check -c .licenserc.yaml
+
+      - name: Check runview license headers (MPL-2.0)
+        run: |
+          if [ -d src/runview ]; then
+            docker run --rm \
+              -v "$PWD:/github/workspace" \
+              -w /github/workspace \
+              apache/skywalking-eyes:0.8.0 \
+              header check -c .licenserc.runview.yaml
+          else
+            echo "src/runview not present; skipping MPL-2.0 check"
+          fi

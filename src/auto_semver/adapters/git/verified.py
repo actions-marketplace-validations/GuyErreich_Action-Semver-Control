@@ -1,6 +1,6 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Verified commit transport (GraphQL + REST)."""
 
 from __future__ import annotations

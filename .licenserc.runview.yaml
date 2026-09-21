@@ -1,0 +1,15 @@
+header:
+  license:
+    spdx-id: MPL-2.0
+    copyright-owner: Guy Erreich
+    content: |
+      Copyright (c) 2025-2026 Guy Erreich
+
+      SPDX-License-Identifier: MPL-2.0
+  paths:
+    - src/runview
+  paths-ignore:
+    - '**/*.json'
+    - '**/__pycache__/**'
+    - '**/py.typed'
+    - '**/LICENSE'

@@ -1,6 +1,6 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Constants for auto-semver configuration."""
 
 CONFIG_FILE: str = "auto_semver_config.yml"

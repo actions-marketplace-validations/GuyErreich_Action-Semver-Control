@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Clean up stale auto-semver-owned release branches on the remote."""
 
 from __future__ import annotations

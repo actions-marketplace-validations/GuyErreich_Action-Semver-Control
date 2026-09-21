@@ -32,6 +32,14 @@ tasks:
           -w /github/workspace \
           apache/skywalking-eyes:0.8.0 \
           header check -c .licenserc.yaml
+      - |
+        if [ -d src/runview ]; then
+          docker run --rm \
+            -v "$PWD:/github/workspace" \
+            -w /github/workspace \
+            apache/skywalking-eyes:0.8.0 \
+            header check -c .licenserc.runview.yaml
+        fi
 
   license-fix:
     desc: Apply missing SPDX license headers (SkyWalking Eyes)
@@ -42,6 +50,14 @@ tasks:
           -w /github/workspace \
           apache/skywalking-eyes:0.8.0 \
           header fix -c .licenserc.yaml
+      - |
+        if [ -d src/runview ]; then
+          docker run --rm \
+            -v "$PWD:/github/workspace" \
+            -w /github/workspace \
+            apache/skywalking-eyes:0.8.0 \
+            header fix -c .licenserc.runview.yaml
+        fi
 
   format:
     desc: Format code with ruff

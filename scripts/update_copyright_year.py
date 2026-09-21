@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Update copyright year ranges across LICENSE, licenserc, and source headers."""
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ COPYRIGHT_RE = re.compile(r"Copyright \(c\) 20\d{2}(?:-20\d{2})? Guy Erreich")
 
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = ("src", "scripts", ".github")
-SCAN_FILES = ("action.yml", "LICENSE", ".licenserc.yaml")
+SCAN_FILES = ("action.yml", "LICENSE", ".licenserc.yaml", ".licenserc.runview.yaml")
 TEXT_SUFFIXES = {".py", ".yml", ".yaml", ".md", ".toml", ".txt", ""}
 
 
@@ -54,6 +54,7 @@ def iter_files() -> list[Path]:
                 "LICENSE",
                 "action.yml",
                 ".licenserc.yaml",
+                ".licenserc.runview.yaml",
             }:
                 # Skip consumer templates (license-check ignores them too).
                 if "templates" in path.parts and path.suffix in {".yml", ".yaml"}:

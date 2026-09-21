@@ -1,6 +1,6 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 """GitOps facade composing local, verified, promote, and release-PR parts."""
 
 from __future__ import annotations
