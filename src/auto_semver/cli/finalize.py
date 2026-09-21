@@ -18,7 +18,7 @@ from auto_semver.cli.utils import build_promotion_metadata_hook, promotion_prefe
 from auto_semver.config import Config
 from auto_semver.config.constants import FINALIZE_LOCK_COMMIT
 from auto_semver.core.semver import SemverLock, Version
-from auto_semver.log import get_summary, log_group, status
+from runview import get_summary, log_group, status
 
 logger = logging.getLogger(__package__)
 

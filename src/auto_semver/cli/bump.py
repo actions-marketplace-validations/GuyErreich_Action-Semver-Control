@@ -18,7 +18,7 @@ from auto_semver.core.semver import Version
 from auto_semver.core.semver.lock import SemverLock
 from auto_semver.core.semver.updater import VersionFileUpdater
 from auto_semver.core.semver.version import BumpCounts
-from auto_semver.log import get_summary, log_group, status
+from runview import get_summary, log_group, status
 
 logger = logging.getLogger(__package__)
 

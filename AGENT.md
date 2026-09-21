@@ -16,15 +16,15 @@ This file defines global working rules for the repository.
 - **Never** import `auto_semver.config._models` (or any submodule of it) outside the `config/` package. `_models` is private packaging for schema definitions; consumers must not reach into it.
 - Inside `config/` only: `config.py` and `_models/*` may import `_models` modules directly.
 
-## Folder map (src/auto_semver)
+## Folder map (src/)
 
-- `config/` — `Config` loader + private `_models` schema (public via `__init__.py`)
-- `core/` — commits, semver, changelog, PR content
-- `adapters/git/` — git operations (`GitOpsBase` + focused ops modules)
-- `cli/` — CLI entrypoints
-- `templates/` — Jinja engine + shared template utils
-- `setup/` — scaffolds / init helpers
-- `log.py` — logging setup
+- `auto_semver/config/` — `Config` loader + private `_models` schema (public via `__init__.py`)
+- `auto_semver/core/` — commits, semver, changelog, PR content
+- `auto_semver/adapters/git/` — git operations (`GitOpsBase` + focused ops modules)
+- `auto_semver/cli/` — CLI entrypoints
+- `auto_semver/templates/` — Jinja engine + shared template utils
+- `auto_semver/setup/` — scaffolds / init helpers
+- `runview/` — structured run presentation (Reporter + renderers); must never import `auto_semver`
 
 ## Validate
 

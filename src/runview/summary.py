@@ -1,7 +1,7 @@
 # Copyright (c) 2025-2026 Guy Erreich
 #
-# SPDX-License-Identifier: GPL-3.0-or-later
-"""Run summary data shared by the Live view and optional GitHub job summary."""
+# SPDX-License-Identifier: MPL-2.0
+"""Run summary data shared by renderers (data + presentation helpers)."""
 
 from __future__ import annotations
 
@@ -10,11 +10,16 @@ from rich.panel import Panel
 from rich.table import Table
 
 
-class JobSummary:
-    """Collect key/value fields for the end-of-run summary panel."""
+class RunSummary:
+    """Collect key/value fields for the end-of-run summary."""
 
-    def __init__(self) -> None:
-        """Initialize an empty field map."""
+    def __init__(self, app_name: str = "run") -> None:
+        """Initialize an empty field map.
+
+        Args:
+            app_name: Product name used in markdown/panel titles.
+        """
+        self.app_name = app_name
         self._fields: dict[str, str] = {}
 
     def set(self, key: str, value: str) -> None:
@@ -37,6 +42,14 @@ class JobSummary:
             Stored value or ``default``.
         """
         return self._fields.get(key, default)
+
+    def items(self) -> list[tuple[str, str]]:
+        """Return summary fields in insertion order.
+
+        Returns:
+            List of ``(key, value)`` pairs.
+        """
+        return list(self._fields.items())
 
     def as_table(self) -> Table:
         """Build a borderless Rich table of summary fields.
@@ -79,8 +92,8 @@ class JobSummary:
             Markdown table string for ``GITHUB_STEP_SUMMARY``.
         """
         if not self._fields:
-            return "## auto-semver\n\n_(no summary fields)_\n"
-        lines = ["## auto-semver", "", "| | |", "| --- | --- |"]
+            return f"## {self.app_name}\n\n_(no summary fields)_\n"
+        lines = [f"## {self.app_name}", "", "| | |", "| --- | --- |"]
         for key, value in self._fields.items():
             safe_key = key.replace("|", "\\|")
             safe_value = value.replace("|", "\\|")

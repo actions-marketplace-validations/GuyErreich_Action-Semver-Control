@@ -20,16 +20,9 @@ from auto_semver.adapters.github import GitHubEvent
 from auto_semver.cli import bump, finalize, promote, setup
 from auto_semver.cli.utils import is_finalized
 from auto_semver.config import Config
-from auto_semver.log import (
-    attach_github_adapter,
-    get_summary,
-    get_view,
-    is_github_actions,
-    log_group,
-    setup_logger,
-    status,
-)
 from auto_semver.setup.check import run_check
+from runview import Config as RunviewConfig
+from runview import close, get_summary, install, log_group, set_command, status
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +57,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Plain-text forensic log path (default: auto-semver.log)",
+    )
+    parent_parser.add_argument(
+        "--log-style",
+        choices=("auto", "rich", "plain", "github"),
+        default="auto",
+        help="Run presentation style (default: auto)",
     )
     parent_parser.add_argument(
         "--signed-commits",
@@ -121,19 +120,25 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _init_logging(args: argparse.Namespace, command: str) -> None:
-    """Configure logging and optionally attach the GitHub Actions adapter.
+    """Configure runview logging and presentation.
 
     Args:
         args: Parsed CLI namespace.
-        command: Short command label for the Live title.
+        command: Short command label for the outer title.
     """
-    setup_logger(
-        getattr(args, "debug", False),
-        log_file=getattr(args, "log_file", None),
-        command=command,
+    log_file = getattr(args, "log_file", None)
+    install(
+        RunviewConfig(
+            app_name="auto-semver",
+            log_file_env="AUTO_SEMVER_LOG_FILE",
+            default_log_file="auto-semver.log",
+            quiet_loggers=("urllib3", "git", "git.cmd", "github", "httpcore", "httpx"),
+            style=getattr(args, "log_style", "auto"),
+            debug=getattr(args, "debug", False),
+            command=command,
+            log_file=str(log_file) if log_file is not None else None,
+        )
     )
-    if is_github_actions():
-        attach_github_adapter()
 
 
 def _run_setup(args: argparse.Namespace) -> None:
@@ -199,9 +204,7 @@ def _run_semver(args: argparse.Namespace) -> None:
 
     assert event is not None
     if finalized:
-        view = get_view()
-        if view is not None:
-            view.set_command("finalize")
+        set_command("finalize")
         get_summary().set("command", "finalize")
         finalize.run(gitops=gitops, event=event, config=config, github_token=args.github_token)
     else:
@@ -270,7 +273,4 @@ def main() -> None:
         sys.exit(1)
     finally:
         if view_started:
-            view = get_view()
-            if view is not None:
-                view.stop()
-                view.flush_summary()
+            close()

@@ -12,6 +12,7 @@ header:
     - .github
     - action.yml
   paths-ignore:
+    - 'src/runview/**'
     - '**/*.json'
     - '**/__pycache__/**'
     - '**/*.egg-info/**'
