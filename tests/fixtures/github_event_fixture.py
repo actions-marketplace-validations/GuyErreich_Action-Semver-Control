@@ -10,8 +10,8 @@ from pathlib import Path
 from pyfakefs.fake_filesystem import FakeFilesystem
 from pytest_mock import MockerFixture
 
-from auto_semver.gh.event import _GITHUB_EVENT_PATH_ENV
-from tests.utils.github_event import GitHubPullRequestEventData
+from auto_semver.adapters.github.event import _GITHUB_EVENT_PATH_ENV
+from tests.fixtures.github_event_helpers import GitHubPullRequestEventData
 
 
 class GitHubEventFixture:

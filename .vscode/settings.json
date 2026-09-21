@@ -2,7 +2,7 @@
     "python.analysis.extraPaths": [
         "./src"
     ],
-    "python.languageServer": "Pylance",
+    "python.languageServer": "None",
     "cSpell.words": [
         "errexit"
     ]

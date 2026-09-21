@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 from dataclasses import dataclass
@@ -12,9 +13,9 @@ from pathlib import Path
 
 from auto_semver.setup.links import load_template
 
-_GH_REMOTE_RE = re.compile(
-    r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/.]+)(?:\.git)?$"
-)
+logger = logging.getLogger(__name__)
+
+_GH_REMOTE_RE = re.compile(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/.]+)(?:\.git)?$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +57,9 @@ def detect_repo(cwd: Path | None = None) -> RepoRef:
     default_branch = "master"
     if branch.returncode == 0:
         default_branch = branch.stdout.strip().rsplit("/", maxsplit=1)[-1]
-    return RepoRef(owner=owner, repo=repo, default_branch=default_branch)
+    ref = RepoRef(owner=owner, repo=repo, default_branch=default_branch)
+    logger.info("Detected repo %s/%s (default_branch=%s)", owner, repo, default_branch)
+    return ref
 
 
 def scaffold_files(root: Path, *, dry_run: bool = False) -> list[Path]:
@@ -76,12 +79,19 @@ def scaffold_files(root: Path, *, dry_run: bool = False) -> list[Path]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         written.append(path)
+    logger.info(
+        "Scaffolded %d files under %s (dry_run=%s)",
+        len(written),
+        root,
+        dry_run,
+    )
     return written
 
 
 def set_repo_secret(*, owner: str, repo: str, name: str, value: str, dry_run: bool) -> None:
     """Set a repository secret using the GitHub CLI."""
     if dry_run:
+        logger.info("Dry-run: would set secret %s on %s/%s", name, owner, repo)
         return
     subprocess.run(
         ["gh", "secret", "set", name, "--repo", f"{owner}/{repo}"],
@@ -89,16 +99,19 @@ def set_repo_secret(*, owner: str, repo: str, name: str, value: str, dry_run: bo
         text=True,
         check=True,
     )
+    logger.info("Set secret %s on %s/%s", name, owner, repo)
 
 
 def set_repo_variable(*, owner: str, repo: str, name: str, value: str, dry_run: bool) -> None:
     """Set a repository Actions variable using the GitHub CLI."""
     if dry_run:
+        logger.info("Dry-run: would set variable %s on %s/%s", name, owner, repo)
         return
     subprocess.run(
         ["gh", "variable", "set", name, "--repo", f"{owner}/{repo}", "--body", value],
         check=True,
     )
+    logger.info("Set variable %s on %s/%s", name, owner, repo)
 
 
 def verify_gh_authenticated() -> None:

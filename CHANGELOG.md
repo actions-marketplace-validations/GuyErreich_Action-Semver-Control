@@ -1,10 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [1.6.5-dev] - 31-08-2026
+## [1.7.0-dev] - 20-09-2026
 
-### 🐛 Bug Fixes & Resolutions
-- stop README @v1 mention and attribute bot commits (#257)
+### ✨ Features & Enhancements
+- add Rich Live logging UI with file log and Actions adapter (#308)
 
 ## License
 This project is licensed under the MIT License.

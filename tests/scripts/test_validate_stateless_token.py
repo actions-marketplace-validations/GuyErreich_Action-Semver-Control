@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from validate_stateless_token import assert_token_shape
 
 

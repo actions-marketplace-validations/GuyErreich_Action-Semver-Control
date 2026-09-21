@@ -1,0 +1,34 @@
+# Copyright (c) 2025-2026 Guy Erreich
+#
+# SPDX-License-Identifier: MIT
+
+start_version: "0.1.0"
+
+suffixes:
+  dev: "-dev"
+  staging: "-rc"
+  master: ""
+
+promotions:
+  - from_branch: dev
+    to_branch: staging
+    auto_promote: true  # Direct promote + tag (App bypass); not a PR
+  - from_branch: staging
+    to_branch: master
+    auto_promote: false
+
+version_files:
+  - "version.txt"
+
+release:
+  strategy: single
+  branch_prefix: auto-semver/release/
+  cleanup_merged: true
+
+bump:
+  mode: classic
+
+pull_request:
+  title: "Release {{version}}"
+  labels:
+    - "semver-bump"

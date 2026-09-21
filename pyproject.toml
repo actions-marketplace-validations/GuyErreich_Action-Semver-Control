@@ -1,6 +1,6 @@
 [project]
 name = "auto_semver"
-version = "1.6.5-dev"
+version = "1.7.0-dev"
 description = "Automatically bump semver, update changelogs, and open release PRs on merge."
 authors = [{ name = "Guy Erreich", email = "gerreich.dev@gmail.com" }]
 readme = "README.md"
@@ -8,11 +8,12 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
-  "gitpython~=3.1.32",
+  "gitpython~=3.1.59",
   "jinja2~=3.1",
   "pydantic~=2.11",
   "pygithub~=2.6",
   "pyyaml~=6.0",
+  "rich>=15.0.0",
 ]
 
 [project.scripts]
@@ -29,7 +30,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"auto_semver.setup.templates" = ["*.yml"]
+"auto_semver.setup.scaffolds" = ["*.yml"]
 
 [tool.pytest.ini_options]
 minversion  = "6.0"
@@ -133,16 +134,26 @@ allow_redefinition = false
 install_types = false
 non_interactive = false
 
+[[tool.mypy.overrides]]
+module = [
+  "auto_semver.adapters.git.local",
+  "auto_semver.adapters.git.verified",
+  "auto_semver.adapters.git.promote",
+  "auto_semver.adapters.git.release_pr",
+]
+# Composition parts intentionally call sibling methods on self.
+disable_error_code = ["attr-defined", "no-any-return"]
+
 [dependency-groups]
 dev = [
   "docker~=7.1",
   "mypy~=1.8",
   "pre-commit~=4.2",
   "pyfakefs~=5.9",
-  "pytest~=8.3",
+  "pytest~=9.0",
   "pytest-cov~=6.1",
   "pytest-mock~=3.14",
-  "ruff~=0.11",
+  "ruff~=0.14.14",
   "types-docker~=7.1",
   "types-PyYAML~=6.0",
   "responses~=0.25",

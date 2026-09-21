@@ -11,11 +11,11 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+from auto_semver.adapters.github.event import GitHubEvent
 from auto_semver.cli.utils import is_finalized, promotion_prefer_source_paths
 from auto_semver.config import Config
 from auto_semver.config.constants import PR_HIDDEN_MARKER
-from auto_semver.gh.event import GitHubEvent
-from auto_semver.semver import SemverLock, Version
+from auto_semver.core.semver import SemverLock, Version
 
 
 class TestIsFinalized:
@@ -91,22 +91,35 @@ class TestIsFinalized:
     def test_is_finalized_title_mismatch(
         self, github_event: Any, mock_config: Any, mock_semver_lock: None
     ) -> None:
-        """Test when PR title doesn't match expected title."""
-        # Create event with different title
+        """Title is not part of finalize identity — date-rich titles still match."""
         github_event.create(
-            title="Release candidate 1.0.0",  # Different title
+            title="Release candidate 1.0.0 — 19-09-2026",
             body=f"This is a test PR body\n{PR_HIDDEN_MARKER}",
             labels=["semver-bump"],
         )
 
         event = GitHubEvent()
-
-        # Configure expected title
         mock_config.data.pull_request.render_title.return_value = "Release 1.0.0"
 
         result = is_finalized(config=mock_config, event=event)
 
-        assert result is False
+        assert result is True
+
+    @pytest.mark.unit
+    def test_is_finalized_with_date_in_title_template(
+        self, github_event: Any, mock_config: Any, mock_semver_lock: None
+    ) -> None:
+        """A title that was rendered with {{date}} is still recognised as finalized."""
+        github_event.create(
+            title="Release 1.0.0 (19-09-2026)",
+            body=f"notes\n{PR_HIDDEN_MARKER}",
+            labels=["semver-bump"],
+        )
+        event = GitHubEvent()
+        # Simulate what a naive re-render with date="" would produce — must not matter
+        mock_config.data.pull_request.render_title.return_value = "Release 1.0.0 ()"
+
+        assert is_finalized(config=mock_config, event=event) is True
 
     @pytest.mark.unit
     def test_is_finalized_missing_marker(
@@ -135,11 +148,11 @@ class TestIsFinalized:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test when PR fails multiple finalization checks."""
-        # Create event that fails on all criteria
+        # Create event that fails on labels + marker (title is no longer checked)
         github_event.create(
-            title="Wrong title",  # Title mismatch
-            body="Body without marker",  # Missing marker
-            labels=[],  # No labels
+            title="Wrong title",
+            body="Body without marker",
+            labels=[],
         )
 
         event = GitHubEvent()
@@ -151,10 +164,10 @@ class TestIsFinalized:
         result = is_finalized(config=mock_config, event=event)
 
         assert result is False
-        # Check logs to ensure all reasons were logged
+        # Check logs to ensure remaining reasons were logged
         assert "Missing labels" in caplog.text
-        assert "Title mismatch" in caplog.text
         assert "Body mismatch" in caplog.text
+        assert "Title mismatch" not in caplog.text
 
 
 class TestPromotionPreferSourcePaths:

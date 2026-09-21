@@ -10,13 +10,12 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+from auto_semver.adapters.git import GitOps
+from auto_semver.adapters.github.event import GitHubEvent
 from auto_semver.cli.finalize import create_auto_promotion_prs, run
-from auto_semver.config import Config, ConfigData
-from auto_semver.config._models._release import ReleaseConfig
-from auto_semver.gh.event import GitHubEvent
-from auto_semver.git import GitOps
-from auto_semver.semver import Version
-from auto_semver.semver.lock import SemverLock
+from auto_semver.config import Config, ConfigData, ReleaseConfig
+from auto_semver.core.semver import Version
+from auto_semver.core.semver.lock import SemverLock
 
 
 class TestFinalize:

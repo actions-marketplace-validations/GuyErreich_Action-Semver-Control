@@ -42,10 +42,14 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from jinja2 import DictLoader, Environment, Template, TemplateSyntaxError, nodes
+from jinja2 import DictLoader, Template, TemplateSyntaxError, nodes
+from jinja2.exceptions import SecurityError
+from jinja2.sandbox import SandboxedEnvironment
+
+from auto_semver.templates.utils import get_pr_template_functions
 
 if TYPE_CHECKING:
-    from .types import (
+    from auto_semver.templates.types import (
         FunctionDict,
         TemplateFunction,
         TemplateValue,
@@ -69,8 +73,8 @@ class TemplateEngine:
 
     def __init__(self) -> None:
         """Initialize the template engine with core functions and filters."""
-        # Create Jinja2 environment with DictLoader for template caching
-        self.env = Environment(loader=DictLoader({}))
+        # Sandboxed environment — consumer-controlled templates must not escape
+        self.env = SandboxedEnvironment(loader=DictLoader({}))
 
         # Storage for registered functions and filters
         self._custom_functions: FunctionDict = {}
@@ -93,6 +97,8 @@ class TemplateEngine:
                 "pluralize": self._pluralize,
             }
         )
+        # PR/changelog helpers live in templates.utils — single registration site
+        self._custom_functions.update(get_pr_template_functions())
 
     def _update_environment(self) -> None:
         """Update the Jinja2 environment with all registered functions and variables."""
@@ -352,6 +358,8 @@ class TemplateEngine:
             return template.render(**variables)
         except TemplateSyntaxError as e:
             raise TemplateSyntaxError(f"Template syntax error: {e}", lineno=1) from e
+        except SecurityError:
+            raise
         except Exception as e:
             raise Exception(f"Template rendering failed: {e}") from e
 
@@ -501,9 +509,9 @@ class TemplateEngine:
         Raises:
             TemplateSyntaxError: If template has syntax errors
         """
-        # Create a temporary environment with DictLoader
+        # Create a temporary sandboxed environment with DictLoader
         loader = DictLoader({name: template_str})
-        temp_env = Environment(loader=loader)
+        temp_env = SandboxedEnvironment(loader=loader)
 
         # Copy our custom functions to the temporary environment
         temp_env.globals.update(self.env.globals)

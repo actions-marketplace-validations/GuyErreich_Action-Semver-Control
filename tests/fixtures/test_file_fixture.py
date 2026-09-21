@@ -6,7 +6,7 @@ This module tests the functionality of the FileFixture class.
 
 import pytest
 
-from auto_semver.semver.version import Version
+from auto_semver.core.semver.version import Version
 from tests.fixtures.file_fixture import FileFixture
 
 

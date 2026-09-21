@@ -14,15 +14,13 @@ import pytest
 # from pyfakefs.fake_filesystem import FakeFilesystem
 from pytest_mock import MockerFixture
 
-from auto_semver.changelog.manager import ChangelogManager
+from auto_semver.adapters.git import GitOps
+from auto_semver.adapters.github.event import GitHubEvent
 from auto_semver.cli.bump import run
-from auto_semver.config import Config, ConfigData
-from auto_semver.config._models._commit_groups import CommitGroupsConfig
-from auto_semver.config._models._release import ReleaseConfig
-from auto_semver.gh.event import GitHubEvent
-from auto_semver.git import GitOps
-from auto_semver.semver import Version
-from auto_semver.semver.lock import SemverLock
+from auto_semver.config import CommitGroupsConfig, Config, ConfigData, ReleaseConfig
+from auto_semver.core.changelog.manager import ChangelogManager
+from auto_semver.core.semver import Version
+from auto_semver.core.semver.lock import SemverLock
 from tests.fixtures.file_fixture import FileFixture
 from tests.fixtures.github_event_fixture import GitHubEventFixture
 
@@ -80,7 +78,7 @@ class TestBump:
         mock = mocker.Mock(spec=SemverLock)
         mock.version = Version.parse("1.0.0")
         # Mock the SemverLock constructor
-        mocker.patch("auto_semver.semver.lock.SemverLock", return_value=mock)
+        mocker.patch("auto_semver.core.semver.lock.SemverLock", return_value=mock)
         # Mock load_from_file (used when checking existing version)
         mocker.patch.object(SemverLock, "load_from_file", return_value=mock)
         return mock

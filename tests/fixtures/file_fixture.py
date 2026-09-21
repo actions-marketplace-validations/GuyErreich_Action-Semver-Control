@@ -9,7 +9,7 @@ from typing import Any
 
 from pyfakefs.fake_filesystem import FakeFilesystem
 
-from auto_semver.semver.version import Version
+from auto_semver.core.semver.version import Version
 
 
 class FileFixture:

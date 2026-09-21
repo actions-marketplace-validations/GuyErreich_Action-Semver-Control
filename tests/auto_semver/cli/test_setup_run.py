@@ -49,7 +49,9 @@ def test_setup_run_full_flow_with_explicit_owner(
 
 
 @pytest.mark.unit
-def test_setup_run_skip_secrets_and_scaffold(mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+def test_setup_run_skip_secrets_and_scaffold(
+    mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Flags skip secret write and file scaffold paths."""
     mocker.patch("auto_semver.cli.setup.verify_gh_authenticated")
     mock_secret = mocker.patch("auto_semver.cli.setup.set_repo_secret")

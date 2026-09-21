@@ -8,16 +8,17 @@ import logging
 
 import yaml
 
-from auto_semver.changelog.manager import ChangelogManager
+from auto_semver.adapters.git import GitOps
+from auto_semver.adapters.github import GitHubEvent
 from auto_semver.config import Config
-from auto_semver.gh import GitHubEvent
-from auto_semver.git import GitOps
-from auto_semver.git.grouper import CommitGrouper
-from auto_semver.pr.github_builder import GitHubPRBuilder, GitHubPRTemplateVariables
-from auto_semver.semver import Version
-from auto_semver.semver.lock import SemverLock
-from auto_semver.semver.updater import VersionFileUpdater
-from auto_semver.semver.version import BumpCounts
+from auto_semver.core.changelog.manager import ChangelogManager
+from auto_semver.core.commits.grouper import CommitGrouper
+from auto_semver.core.pr.github_builder import GitHubPRBuilder, GitHubPRTemplateVariables
+from auto_semver.core.semver import Version
+from auto_semver.core.semver.lock import SemverLock
+from auto_semver.core.semver.updater import VersionFileUpdater
+from auto_semver.core.semver.version import BumpCounts
+from auto_semver.log import get_summary, log_group, status
 
 logger = logging.getLogger(__package__)
 
@@ -218,162 +219,173 @@ def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str
 
     """
     changelog = ChangelogManager.from_config(config)
+    summary = get_summary()
 
     current_branch: str = event.get_source_branch_name()
     target_branch: str = event.get_target_branch_name()
     release_cfg = config.data.release
 
     repo_full_name: str = gitops.get_repository_name()
+    summary.set("branches", f"{current_branch} -> {target_branch}")
 
     if target_branch not in config.data.suffixes:
         logger.error(f"Target branch '{target_branch}' not found in suffixes configuration.")
         raise ValueError(f"Target branch '{target_branch}' is not configured in suffixes.")
 
-    logger.info(f"Branch name: {current_branch}")
+    with log_group("Resolve version"):
+        logger.info(f"Branch name: {current_branch}")
+        with status("Fetching baseline..."):
+            gitops.fetch()
+            version = _resolve_baseline_version(
+                gitops=gitops,
+                config=config,
+                target_branch=target_branch,
+                github_token=github_token,
+            )
+        previous_version_str = str(version)
 
-    gitops.fetch()
-    version = _resolve_baseline_version(
-        gitops=gitops,
-        config=config,
-        target_branch=target_branch,
-        github_token=github_token,
-    )
-    previous_version_str = str(version)
+        is_tag_promotion = _is_tag_promotion_scenario(
+            version=version, target_branch=target_branch, config=config
+        )
 
-    is_tag_promotion = _is_tag_promotion_scenario(
-        version=version, target_branch=target_branch, config=config
-    )
+        if is_tag_promotion:
+            logger.info(f"Detected tag promotion: {version} → {target_branch}")
+        else:
+            logger.info(f"Standard bump workflow: {current_branch} → {target_branch}")
 
-    if is_tag_promotion:
-        logger.info(f"Detected tag promotion: {version} → {target_branch}")
-    else:
-        logger.info(f"Standard bump workflow: {current_branch} → {target_branch}")
+        logger.info(f"Current version: {version}")
 
-    logger.info(f"Current version: {version}")
+        bump_counts: BumpCounts | None = None
 
-    bump_counts: BumpCounts | None = None
-
-    lockfile = SemverLock.get_or_create(
-        version=version,
-        source_branch=current_branch,
-        target_branch=target_branch,
-    )
-    baseline_sha = lockfile.target_base_sha
-
-    if not is_tag_promotion:
-        bump_counts = _apply_version_bump(
+        lockfile = SemverLock.get_or_create(
             version=version,
-            config=config,
-            current_branch=current_branch,
-            gitops=gitops,
+            source_branch=current_branch,
             target_branch=target_branch,
-            baseline_sha=baseline_sha,
-            github_token=github_token,
         )
-    else:
-        logger.info("Skipping version bump for tag promotion - preserving version numbers")
+        baseline_sha = lockfile.target_base_sha
 
-    suffix: str = config.data.suffixes[target_branch]
-    version.set_suffix(suffix=suffix)
-    new_version: str = str(version)
-
-    logger.info(f"New version: {new_version}")
-
-    files_to_update: list[str] = config.data.version_files
-
-    for path in files_to_update:
-        VersionFileUpdater(file_path=path, version=version).update()
-
-    release_branch_name = f"{release_cfg.branch_prefix.rstrip('/')}/{new_version}"
-
-    lockfile.version = version
-    lockfile.as_release_branch_lock()
-
-    try:
-        previous_lock_content = gitops.get_file_content_at_commit("HEAD~1", SemverLock.path)
-        if previous_lock_content:
-            previous_lock = SemverLock.from_dict(yaml.safe_load(previous_lock_content))
-            if previous_lock.target_base_sha != lockfile.target_base_sha:
-                logger.info(
-                    "Baseline SHA changed in previous commit. "
-                    "Detected potential Release PR match. Starting fresh changelog."
+        if not is_tag_promotion:
+            with status("Applying version bump..."):
+                bump_counts = _apply_version_bump(
+                    version=version,
+                    config=config,
+                    current_branch=current_branch,
+                    gitops=gitops,
+                    target_branch=target_branch,
+                    baseline_sha=baseline_sha,
+                    github_token=github_token,
                 )
-                changelog.truncate = True
-    except Exception as e:
-        logger.warning(
-            f"Failed to compare lockfile with previous commit (HEAD~1). "
-            f"Skipping baseline check. Details: {e}"
+        else:
+            logger.info("Skipping version bump for tag promotion - preserving version numbers")
+
+        suffix: str = config.data.suffixes[target_branch]
+        version.set_suffix(suffix=suffix)
+        new_version: str = str(version)
+        summary.set("version", f"{previous_version_str} -> {new_version}")
+        logger.info(f"New version: {new_version}")
+
+    with log_group("Update files/changelog"):
+        files_to_update: list[str] = config.data.version_files
+
+        with status("Updating version files and changelog..."):
+            for path in files_to_update:
+                VersionFileUpdater(file_path=path, version=version).update()
+
+            release_branch_name = f"{release_cfg.branch_prefix.rstrip('/')}/{new_version}"
+
+            lockfile.version = version
+            lockfile.as_release_branch_lock()
+
+            try:
+                previous_lock_content = gitops.get_file_content_at_commit("HEAD~1", SemverLock.path)
+                if previous_lock_content:
+                    previous_lock = SemverLock.from_dict(yaml.safe_load(previous_lock_content))
+                    if previous_lock.target_base_sha != lockfile.target_base_sha:
+                        logger.info(
+                            "Baseline SHA changed in previous commit. "
+                            "Detected potential Release PR match. Starting fresh changelog."
+                        )
+                        changelog.truncate = True
+            except Exception as e:
+                logger.warning(
+                    f"Failed to compare lockfile with previous commit (HEAD~1). "
+                    f"Skipping baseline check. Details: {e}"
+                )
+
+            latest_commit_sha = lockfile.target_base_sha or event.get_merged_commit_sha()
+
+            commit_messages = gitops.get_recent_commits(latest_commit_sha, config=config)
+            changelog.update(
+                version=new_version,
+                messages=commit_messages,
+                commit_groups=config.data.commit_groups.groups,
+            )
+
+            lockfile.target_base_sha = event.get_merged_commit_sha()
+            lockfile.save_to_file()
+
+    with log_group("Git commit/push"):
+        with status("Creating release branch and pushing..."):
+            gitops.create_branch(branch_name=release_branch_name, force=True)
+            gitops.add(files_to_update)
+            gitops.add([lockfile.path])
+            gitops.add([changelog.path])
+            gitops.commit(f"Release {new_version}", force=True)
+            _push_release_branch(gitops=gitops, release_branch_name=release_branch_name)
+
+        if release_cfg.strategy == "single":
+            _supersede_old_releases_in_single_mode(
+                gitops=gitops,
+                config=config,
+                github_token=github_token,
+                target_branch=target_branch,
+                release_branch_name=release_branch_name,
+            )
+        else:
+            logger.info("release.strategy=multi — keeping existing open release PRs")
+
+    with log_group("Open PR"):
+        release_date = datetime.date.today().strftime("%d-%m-%Y")
+
+        commit_groups_data = None
+        if config.data.commit_groups.groups:
+            commit_groups_data = CommitGrouper.group_messages(
+                commit_messages, config.data.commit_groups
+            )
+
+        pr_variables = GitHubPRTemplateVariables(
+            version=new_version,
+            previous_version=previous_version_str,
+            commit_groups=commit_groups_data or [],
+            breaking_changes=[],
+            author=event.get_actor() if hasattr(event, "get_actor") else "auto-semver",
+            repository=repo_full_name,
+            date=release_date,
+            branch=release_branch_name,
+            base_branch=target_branch,
+            labels=config.data.pull_request.labels,
+            groups=commit_groups_data,
+            feature_count=bump_counts.feature_count if bump_counts else 0,
+            fix_count=bump_counts.fix_count if bump_counts else 0,
         )
 
-    latest_commit_sha = lockfile.target_base_sha or event.get_merged_commit_sha()
-
-    commit_messages = gitops.get_recent_commits(latest_commit_sha, config=config)
-    changelog.update(
-        version=new_version,
-        messages=commit_messages,
-        commit_groups=config.data.commit_groups.groups,
-    )
-
-    lockfile.target_base_sha = event.get_merged_commit_sha()
-    lockfile.save_to_file()
-
-    gitops.create_branch(branch_name=release_branch_name, force=True)
-    gitops.add(files_to_update)
-    gitops.add([lockfile.path])
-    gitops.add([changelog.path])
-    gitops.commit(f"Release {new_version}", force=True)
-    _push_release_branch(gitops=gitops, release_branch_name=release_branch_name)
-
-    if release_cfg.strategy == "single":
-        _supersede_old_releases_in_single_mode(
-            gitops=gitops,
-            config=config,
-            github_token=github_token,
-            target_branch=target_branch,
-            release_branch_name=release_branch_name,
-        )
-    else:
-        logger.info("release.strategy=multi — keeping existing open release PRs")
-
-    release_date = datetime.date.today().strftime("%d-%m-%Y")
-
-    commit_groups_data = None
-    if config.data.commit_groups.groups:
-        commit_groups_data = CommitGrouper.group_messages(
-            commit_messages, config.data.commit_groups
+        pr_builder = GitHubPRBuilder(
+            data=pr_variables,
+            title_template=config.data.pull_request.title,
+            body_template=config.data.pull_request.body,
+            labels_template=",".join(config.data.pull_request.labels or []),
         )
 
-    pr_variables = GitHubPRTemplateVariables(
-        version=new_version,
-        previous_version=previous_version_str,
-        commit_groups=commit_groups_data or [],
-        breaking_changes=[],
-        author=event.get_actor() if hasattr(event, "get_actor") else "auto-semver",
-        repository=repo_full_name,
-        date=release_date,
-        branch=release_branch_name,
-        base_branch=target_branch,
-        labels=config.data.pull_request.labels,
-        groups=commit_groups_data,
-        feature_count=bump_counts.feature_count if bump_counts else 0,
-        fix_count=bump_counts.fix_count if bump_counts else 0,
-    )
+        pr_title: str = pr_builder.title
+        pr_body: str = pr_builder.body
 
-    pr_builder = GitHubPRBuilder(
-        data=pr_variables,
-        title_template=config.data.pull_request.title,
-        body_template=config.data.pull_request.body,
-        labels_template=",".join(config.data.pull_request.labels or []),
-    )
-
-    pr_title: str = pr_builder.title
-    pr_body: str = pr_builder.body
-
-    gitops.create_pr(
-        title=pr_title,
-        body=pr_body,
-        source=release_branch_name,
-        target=target_branch,
-        github_token=github_token,
-        labels=config.data.pull_request.labels,
-    )
+        with status("Opening pull request..."):
+            pr_number = gitops.create_pr(
+                title=pr_title,
+                body=pr_body,
+                source=release_branch_name,
+                target=target_branch,
+                github_token=github_token,
+                labels=config.data.pull_request.labels,
+            )
+        summary.set("pr", f"#{pr_number}")

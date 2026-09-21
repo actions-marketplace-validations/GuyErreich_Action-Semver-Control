@@ -52,4 +52,5 @@ jobs:
         # target-branch: ${{ github.ref_name }}
         github-token: ${{ steps.app-token.outputs.token }}
         # repo-full-name: ${{ github.repository }}
-        debug: true
+        debug: false
+        signed-commits: true

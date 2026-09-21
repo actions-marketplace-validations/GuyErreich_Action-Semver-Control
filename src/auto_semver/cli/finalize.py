@@ -6,16 +6,19 @@ Handles the finalization step of the auto-semver workflow.
 
 This script is responsible for verifying that the merged PR is
 an auto-generated release PR and, if so, creating and pushing a Git tag.
-After tagging, it checks for auto-promotion rules and creates promotion PRs automatically.
+After tagging, it checks for auto-promotion rules and promotes directly
+(App bypass + verified tip update + destination tag), not via a promotion PR.
 """
 
 import logging
 
+from auto_semver.adapters.git import GitOps
+from auto_semver.adapters.github import GitHubEvent
 from auto_semver.cli.utils import build_promotion_metadata_hook, promotion_prefer_source_paths
 from auto_semver.config import Config
-from auto_semver.gh import GitHubEvent
-from auto_semver.git import GitOps
-from auto_semver.semver import SemverLock, Version
+from auto_semver.config.constants import FINALIZE_LOCK_COMMIT
+from auto_semver.core.semver import SemverLock, Version
+from auto_semver.log import get_summary, log_group, status
 
 logger = logging.getLogger(__package__)
 
@@ -61,7 +64,7 @@ def _rewrite_baseline_lock(*, gitops: GitOps, event: GitHubEvent, version: str) 
     lock.as_finalized_baseline(merge_sha=merge_sha)
     lock.save_to_file()
     gitops.add([lock.path])
-    gitops.commit(f"chore: finalize semver lock for {version}")
+    gitops.commit(FINALIZE_LOCK_COMMIT.format(version=version))
 
 
 def _cleanup_release_branch(
@@ -106,7 +109,11 @@ def create_auto_promotion_prs(
     github_token: str | None = None,
 ) -> None:
     """
-    Create auto-promotion PRs based on configuration rules.
+    Auto-promote to configured target branches after tagging.
+
+    Despite the historical name, this does **not** open promotion PRs. It calls
+    ``gitops.auto_promote`` so the App token can update each target branch and
+    create the destination tag in one shot.
 
     Args:
         gitops (GitOps): Git operations handler.
@@ -114,7 +121,7 @@ def create_auto_promotion_prs(
         config (Config): Loaded configuration object.
         target_branch (str): The branch that was just tagged.
         version (str): The version that was just tagged.
-        github_token (str, optional): GitHub token for creating promotion PRs.
+        github_token (str, optional): Reserved for release-branch cleanup callers.
     """
     logger.info(f"Successfully tagged {target_branch} with {version}")
 
@@ -171,34 +178,46 @@ def run(
     """
     Finalize the release process by tagging the merged version.
 
-    After tagging, check for auto-promotion rules and create promotion PRs if configured.
+    After tagging, check for auto-promotion rules and promote directly when configured.
 
     Args:
         gitops (GitOps): Git operations handler.
         event (GitHubEvent): GitHub event wrapper for PR metadata.
         config (Config): Loaded configuration object.
-        github_token (str, optional): GitHub token for creating promotion PRs.
+        github_token (str, optional): GitHub token for App-backed git ops / cleanup.
 
     """
-    target_branch, version = create_and_push_tag(gitops=gitops, event=event, config=config)
+    summary = get_summary()
 
-    try:
-        _rewrite_baseline_lock(gitops=gitops, event=event, version=version)
-    except Exception as err:
-        logger.warning("Failed to rewrite baseline lock on %s: %s", target_branch, err)
+    with log_group("Tag"):
+        with status("Creating and pushing tag..."):
+            target_branch, version = create_and_push_tag(gitops=gitops, event=event, config=config)
+        summary.set("branches", f"-> {target_branch}")
+        summary.set("version", version)
 
-    _cleanup_release_branch(
-        gitops=gitops,
-        event=event,
-        config=config,
-        github_token=github_token,
-    )
+    with log_group("Baseline lock"):
+        try:
+            with status("Rewriting baseline lock..."):
+                _rewrite_baseline_lock(gitops=gitops, event=event, version=version)
+        except Exception as err:
+            logger.warning("Failed to rewrite baseline lock on %s: %s", target_branch, err)
 
-    create_auto_promotion_prs(
-        gitops=gitops,
-        event=event,
-        config=config,
-        target_branch=target_branch,
-        version=version,
-        github_token=github_token,
-    )
+    with log_group("Cleanup"):
+        with status("Cleaning up release branch..."):
+            _cleanup_release_branch(
+                gitops=gitops,
+                event=event,
+                config=config,
+                github_token=github_token,
+            )
+
+    with log_group("Auto-promote"):
+        with status("Running auto-promotion..."):
+            create_auto_promotion_prs(
+                gitops=gitops,
+                event=event,
+                config=config,
+                target_branch=target_branch,
+                version=version,
+                github_token=github_token,
+            )

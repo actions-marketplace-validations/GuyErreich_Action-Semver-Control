@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 """CLI main entry point for auto_semver."""
 
-from .main import main
+from auto_semver.cli.main import main
 
 if __name__ == "__main__":
     main()

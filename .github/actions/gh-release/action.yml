@@ -35,6 +35,9 @@ runs:
           # and stop before the License section if it exists
           # Use sed to print from the first version header line until the License section or end of file
           sed -n '/^## \[/,$p' CHANGELOG.md | sed '/^## License/Q' > RELEASE_NOTES.md
+          # Prevent GitHub from autolinking bare @v1 / @v2… to squatted usernames
+          # in release notes (e.g. github.com/v1). Keep the floating git tag unchanged.
+          sed -i -E 's/@v([0-9]+)/`v\1` tag/g' RELEASE_NOTES.md
           echo "notes_file=RELEASE_NOTES.md" >> $GITHUB_OUTPUT
         else
           echo "CHANGELOG.md not found, falling back to auto-generated notes"

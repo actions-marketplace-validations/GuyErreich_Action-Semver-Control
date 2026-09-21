@@ -36,8 +36,8 @@ uvx --from git+https://github.com/GuyErreich/Action-Semver-Control auto-semver s
 ### Add workflows without the CLI
 
 1. **[Register a GitHub App](https://github.com/settings/apps/new?name=Auto+Semver+Bot&description=Signed+commits+and+PRs+for+Action-Semver-Control&url=https%3A%2F%2Fgithub.com%2FGuyErreich%2FAction-Semver-Control&public=true&webhook_active=false&contents=write&pull_requests=write)** — install it on your repo, set variable `GH_APP_CLIENT_ID` and secret `GH_APP_PRIVATE_KEY`.
-2. **Add a caller workflow** — copy [src/auto_semver/setup/templates/auto-semver.caller.yml](src/auto_semver/setup/templates/auto-semver.caller.yml) to `.github/workflows/auto-semver.yml`.
-3. **Add config** — copy [src/auto_semver/setup/templates/auto_semver_config.yml](src/auto_semver/setup/templates/auto_semver_config.yml) to `auto_semver_config.yml` and edit branch suffixes.
+2. **Add a caller workflow** — copy [src/auto_semver/setup/scaffolds/auto-semver.caller.yml](src/auto_semver/setup/scaffolds/auto-semver.caller.yml) to `.github/workflows/auto-semver.yml`.
+3. **Add config** — copy [src/auto_semver/setup/scaffolds/auto_semver_config.yml](src/auto_semver/setup/scaffolds/auto_semver_config.yml) to `auto_semver_config.yml` and edit branch suffixes.
 
 Regenerate prefilled “add workflow” links for your repo:
 

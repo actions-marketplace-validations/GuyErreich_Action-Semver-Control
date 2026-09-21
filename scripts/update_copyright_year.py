@@ -13,9 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 START_YEAR = 2025
-COPYRIGHT_RE = re.compile(
-    r"Copyright \(c\) 20\d{2}(?:-20\d{2})? Guy Erreich"
-)
+COPYRIGHT_RE = re.compile(r"Copyright \(c\) 20\d{2}(?:-20\d{2})? Guy Erreich")
 
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_ROOTS = ("src", "scripts", ".github")

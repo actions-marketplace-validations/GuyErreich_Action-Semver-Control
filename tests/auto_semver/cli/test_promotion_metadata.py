@@ -6,7 +6,7 @@ import pytest
 
 from auto_semver.cli.utils import apply_promotion_metadata
 from auto_semver.config import Config
-from auto_semver.semver import SemverLock
+from auto_semver.core.semver import SemverLock
 
 _BASE_CONFIG = """
 start_version: "0.1.0"

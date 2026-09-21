@@ -13,10 +13,14 @@ from typing import Any
 
 
 def format_date_iso_to_custom(date_str: str, fmt: str = "%Y-%m-%d") -> str:
-    """Format date string from ISO format (YYYY-MM-DD) to custom format.
+    """Format a date string to a custom format.
+
+    Accepts ISO ``YYYY-MM-DD`` and common day-first ``DD-MM-YYYY`` inputs
+    (the format bump/changelog already emit). Returns the original string
+    when parsing fails — never raises on bad input.
 
     Args:
-        date_str: Date string in YYYY-MM-DD format.
+        date_str: Date string to parse.
         fmt: Target format string (default: "%Y-%m-%d").
 
     Returns:
@@ -27,13 +31,17 @@ def format_date_iso_to_custom(date_str: str, fmt: str = "%Y-%m-%d") -> str:
         'December 25, 2024'
         >>> format_date_iso_to_custom("2024-12-25", "%d-%m-%Y")
         '25-12-2024'
+        >>> format_date_iso_to_custom("25-12-2024", "%Y-%m-%d")
+        '2024-12-25'
         >>> format_date_iso_to_custom("invalid-date")
         'invalid-date'
     """
-    try:
-        return datetime.strptime(date_str, "%Y-%m-%d").strftime(fmt)
-    except (ValueError, TypeError):
-        return str(date_str)  # Return as string if parsing fails
+    for input_fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(date_str, input_fmt).strftime(fmt)
+        except (ValueError, TypeError):
+            continue
+    return str(date_str)
 
 
 def truncate_text(text: str, length: int = 72, suffix: str = "...") -> str:
@@ -99,6 +107,74 @@ def extract_prefix_before_delimiter(text: str, delimiter: str = ":") -> str:
         'other'
     """
     return text.split(delimiter)[0].strip() if delimiter in text else "other"
+
+
+def truncate_commit(msg: str, length: int = 72) -> str:
+    """Truncate a commit message for template use."""
+    return truncate_text(msg, length)
+
+
+def format_date_custom(date_str: str, fmt: str = "%Y-%m-%d") -> str:
+    """Format a date string with a custom format (template-facing alias)."""
+    return format_date_iso_to_custom(date_str, fmt)
+
+
+def conventional_type(msg: str) -> str:
+    """Extract conventional-commit type from a message."""
+    return extract_prefix_before_delimiter(msg, ":")
+
+
+def capitalize_first(text: str) -> str:
+    """Capitalize the first letter (template-facing alias)."""
+    return capitalize_first_letter(text)
+
+
+def _group_commits(group: Any) -> list[Any]:
+    commits = getattr(group, "commits", None)
+    if commits is None and isinstance(group, dict):
+        commits = group.get("commits", [])
+    return list(commits) if commits else []
+
+
+def _group_title(group: Any) -> str:
+    title = getattr(group, "title", None)
+    if title is None and isinstance(group, dict):
+        title = group.get("title", "")
+    return str(title or "")
+
+
+def count_commits(groups: Any) -> int:
+    """Count total commits across groups (objects or dicts)."""
+    if not groups:
+        return 0
+    return sum(len(_group_commits(group)) for group in groups)
+
+
+def has_breaking(groups: Any) -> bool:
+    """Return True if any group title looks like a breaking-change section."""
+    if not groups:
+        return False
+    return any(
+        "breaking" in _group_title(group).lower() or "🔥" in _group_title(group) for group in groups
+    )
+
+
+def count_groups(groups: Any) -> int:
+    """Count the number of commit groups."""
+    return len(groups) if groups else 0
+
+
+def get_pr_template_functions() -> dict[str, Any]:
+    """Return the single shared set of PR/changelog template callables."""
+    return {
+        "truncate_commit": truncate_commit,
+        "format_date_custom": format_date_custom,
+        "conventional_type": conventional_type,
+        "capitalize_first": capitalize_first,
+        "count_commits": count_commits,
+        "has_breaking": has_breaking,
+        "count_groups": count_groups,
+    }
 
 
 def count_items_in_groups(groups: list[dict[str, Any]] | None, items_key: str = "commits") -> int:

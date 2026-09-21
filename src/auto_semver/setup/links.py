@@ -88,7 +88,7 @@ def new_file_pr_url(
 
 def load_template(name: str) -> str:
     """Load a static onboarding template bundled with the package."""
-    path = importlib.resources.files("auto_semver.setup.templates").joinpath(name)
+    path = importlib.resources.files("auto_semver.setup.scaffolds").joinpath(name)
     return path.read_text(encoding="utf-8")
 
 

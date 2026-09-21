@@ -71,7 +71,9 @@ def _github_request(
 
 def get_installation_id(*, app_jwt: str, owner: str, repo: str) -> int:
     """Return the installation ID for a repository."""
-    payload = _github_request(method="GET", path=f"/repos/{owner}/{repo}/installation", app_jwt=app_jwt)
+    payload = _github_request(
+        method="GET", path=f"/repos/{owner}/{repo}/installation", app_jwt=app_jwt
+    )
     installation_id = payload.get("id")
     if not isinstance(installation_id, int):
         raise RuntimeError(f"Unexpected installation response: {payload!r}")
@@ -172,11 +174,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     """Mint, validate shape, and exercise consumer paths for one token mode."""
     args = parse_args(argv)
-    app_id = (
-        args.app_id
-        or os.environ.get("GH_APP_CLIENT_ID")
-        or os.environ.get("GH_APP_ID")
-    )
+    app_id = args.app_id or os.environ.get("GH_APP_CLIENT_ID") or os.environ.get("GH_APP_ID")
     if not app_id or not args.private_key:
         print(
             "GH_APP_CLIENT_ID (or GH_APP_ID) and GH_APP_PRIVATE_KEY are required",

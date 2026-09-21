@@ -10,9 +10,8 @@ from pathlib import Path
 import pytest
 from jinja2 import TemplateSyntaxError
 
-from auto_semver.changelog.manager import ChangelogManager
-from auto_semver.config._models._changelog import ChangelogConfig
-from auto_semver.config._models._pull_request import PullRequestConfig, PullRequestTemplateVars
+from auto_semver.config import ChangelogConfig, PullRequestConfig, PullRequestTemplateVars
+from auto_semver.core.changelog.manager import ChangelogManager
 from auto_semver.templates.engine import get_template_engine, reset_template_engine
 
 
@@ -122,32 +121,18 @@ class TestPullRequestConfigTemplateRegistration:
         reset_template_engine()
 
     @pytest.mark.unit
-    def test_pr_config_auto_registers_functions(self) -> None:
-        """Test that PullRequestConfig automatically registers its template functions."""
+    def test_pr_config_does_not_register_on_construction(self) -> None:
+        """PullRequestConfig must not mutate the global engine as a construction side effect."""
         engine = get_template_engine()
-
-        # Before creating config, PR functions should not be registered
-        functions_before = set(engine.list_functions())
-
-        # Create PR config (should trigger registration)
+        # Functions are already built-ins on a fresh engine
+        assert "format_date_custom" in engine.list_functions()
+        before = set(engine.list_functions())
         _config = PullRequestConfig()
-
-        # After creating config, PR functions should be registered
-        functions_after = set(engine.list_functions())
-        new_functions = functions_after - functions_before
-
-        assert "truncate_commit" in new_functions
-        assert "format_date_custom" in new_functions
-        assert "conventional_type" in new_functions
-        assert "capitalize_first" in new_functions
-        assert "count_commits" in new_functions
-        assert "has_breaking" in new_functions
-        assert "count_groups" in new_functions
+        assert set(engine.list_functions()) == before
 
     @pytest.mark.unit
     def test_pr_template_functions_work(self) -> None:
         """Test that registered PR template functions work correctly."""
-        _config = PullRequestConfig()
         engine = get_template_engine()
 
         # Test truncate_commit function
@@ -164,6 +149,16 @@ class TestPullRequestConfigTemplateRegistration:
         # Test capitalize_first function
         result = engine.render_template("{{ capitalize_first('hello world') }}", {})
         assert result == "Hello world"
+
+    @pytest.mark.unit
+    def test_format_date_custom_accepts_day_first_date(self) -> None:
+        """%d-%m-%Y strings (as bump supplies) must format, not raise."""
+        engine = get_template_engine()
+        result = engine.render_template(
+            "{{ format_date_custom('19-09-2026', '%Y-%m-%d') }}",
+            {},
+        )
+        assert result == "2026-09-19"
 
     @pytest.mark.unit
     def test_pr_template_functions_as_filters(self) -> None:
@@ -229,7 +224,7 @@ class TestConfigModelInteraction:
         _changelog_manager = ChangelogManager(
             path=Path("test.md"), truncate=False, template="test", header="", footer=""
         )
-        # Note: PullRequestConfig still has its own registration for now
+        # PR functions are built into the engine; PullRequestConfig no longer registers
         _pr_config = PullRequestConfig()
 
         engine = get_template_engine()
@@ -277,10 +272,13 @@ class TestConfigModelInteraction:
         new_engine = get_template_engine()
         functions_after_reset = set(new_engine.list_functions())
 
-        # Config-specific functions should be gone
+        # Changelog-manager registration is gone after reset
         assert "format_date_changelog" not in functions_after_reset
-        assert "truncate_commit" not in functions_after_reset
 
-        # But built-in functions should still be there
+        # PR helpers are engine built-ins and remain after reset
+        assert "truncate_commit" in functions_after_reset
+        assert "format_date_custom" in functions_after_reset
+
+        # Core built-in functions should still be there
         assert "format_date" in functions_after_reset
         assert "pluralize" in functions_after_reset

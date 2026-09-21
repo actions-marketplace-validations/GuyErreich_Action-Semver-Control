@@ -25,8 +25,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # Docker avoids nested unpinned actions inside apache/skywalking-eyes (e.g. setup-go@v5)
+      # which fail when the repo requires full-length commit SHA pins.
       - name: Check license headers
-        uses: apache/skywalking-eyes@61275cc80d0798a405cb070f7d3a8aaf7cf2c2c1 # v0.8.0
-        with:
-          config: .licenserc.yaml
-          mode: check
+        run: |
+          docker run --rm \
+            -v "$PWD:/github/workspace" \
+            -w /github/workspace \
+            apache/skywalking-eyes:0.8.0 \
+            header check -c .licenserc.yaml

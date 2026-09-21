@@ -1,5 +1,6 @@
 """Tests for setup check run_check entrypoint."""
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,11 @@ from auto_semver.setup.check import run_check
 
 
 @pytest.mark.unit
-def test_run_check_fails_without_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_check_fails_without_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """run_check returns False when config file is missing."""
     monkeypatch.chdir(tmp_path)
     workflows = tmp_path / ".github" / "workflows"
@@ -25,4 +30,6 @@ jobs:
         encoding="utf-8",
     )
 
-    assert run_check() is False
+    with caplog.at_level(logging.INFO, logger="auto_semver.setup.check"):
+        assert run_check() is False
+    assert any("Setup check failed" in r.message for r in caplog.records)

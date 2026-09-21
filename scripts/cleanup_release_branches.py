@@ -11,8 +11,8 @@ import logging
 import os
 import sys
 
+from auto_semver.adapters.git.ops import GitOps
 from auto_semver.config import Config
-from auto_semver.git.ops import GitOps
 
 logger = logging.getLogger(__name__)
 

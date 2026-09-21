@@ -19,11 +19,11 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 from pytest_mock import MockerFixture
 from tests.fixtures.config_fixture import ConfigFixture
 
+from auto_semver.adapters.git import GitOps
+from auto_semver.adapters.github import GitHubEvent
+from auto_semver.adapters.github.event import _GITHUB_EVENT_PATH_ENV
 from auto_semver.cli import finalize
 from auto_semver.config import Config
-from auto_semver.gh import GitHubEvent
-from auto_semver.gh.event import _GITHUB_EVENT_PATH_ENV
-from auto_semver.git import GitOps
 
 
 class GitHubEventHelper:

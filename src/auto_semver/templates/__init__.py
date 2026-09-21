@@ -7,12 +7,12 @@ Expose the primary engine class, helper functions, and common type aliases at th
 package level so consumers can import from ``auto_semver.templates`` directly.
 """
 
-from .engine import (
+from auto_semver.templates.engine import (
     TemplateEngine,
     get_template_engine,
     reset_template_engine,
 )
-from .types import (
+from auto_semver.templates.types import (
     TemplateFunction,
     TemplateVariables,
 )

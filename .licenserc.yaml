@@ -14,6 +14,7 @@ header:
   paths-ignore:
     - '**/*.json'
     - '**/__pycache__/**'
+    - '**/*.egg-info/**'
     - '**/py.typed'
     - 'src/**/templates/**'
     - '.github/copilot/**'

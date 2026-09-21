@@ -10,6 +10,7 @@ from typing import Any, cast
 
 import pytest
 from jinja2 import TemplateSyntaxError
+from jinja2.exceptions import SecurityError
 
 from auto_semver.templates import (
     TemplateEngine,
@@ -39,14 +40,14 @@ class TestTemplateEngine:
         assert "list_join" in functions
         assert "truncate_text" in functions
         assert "pluralize" in functions
+        assert "format_date_custom" in functions
 
     @pytest.mark.unit
-    def test_singleton_pattern(self) -> None:
-        """Test that get_template_engine returns the same instance."""
-        engine1 = get_template_engine()
-        engine2 = get_template_engine()
-
-        assert engine1 is engine2
+    def test_sandbox_blocks_attribute_escape(self) -> None:
+        """Consumer templates must not reach object subclasses via attribute access."""
+        engine = TemplateEngine()
+        with pytest.raises(SecurityError):
+            engine.render_template("{{ ''.__class__.__mro__[1].__subclasses__() }}", {})
 
     @pytest.mark.unit
     def test_reset_engine(self) -> None:

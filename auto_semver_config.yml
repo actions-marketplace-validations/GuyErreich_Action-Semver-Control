@@ -8,7 +8,7 @@ suffixes:
 promotions:
   - from_branch: dev
     to_branch: staging
-    auto_promote: true  # Automatically create staging PR after dev tagging
+    auto_promote: true  # Direct promote to staging after dev tagging (not a PR)
   - from_branch: staging
     to_branch: master
     auto_promote: false # Manual promotion only for production

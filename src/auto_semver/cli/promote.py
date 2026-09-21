@@ -10,10 +10,11 @@ against the configured promotion rules.
 
 import logging
 
+from auto_semver.adapters.git import GitOps
 from auto_semver.cli.utils import build_promotion_metadata_hook, promotion_prefer_source_paths
 from auto_semver.config import Config
-from auto_semver.git import GitOps
-from auto_semver.semver import Version
+from auto_semver.core.semver import Version
+from auto_semver.log import get_summary, log_group, status
 
 logger = logging.getLogger(__name__)
 
@@ -42,66 +43,77 @@ def run(
         ValueError: If promotion is not allowed or fails.
     """
     logger.info(f"Initiating manual promotion to {to_branch}")
+    summary = get_summary()
+    summary.set("command", "promote")
+    summary.set("dry-run", "yes" if dry_run else "no")
 
-    try:
-        version, source_branch = _get_source_version(gitops, config, from_tag, from_branch)
-    except Exception as e:
-        raise ValueError(f"Failed to get version from source: {e}") from e
+    with log_group("Validate"):
+        with status("Resolving source version..."):
+            try:
+                version, source_branch = _get_source_version(gitops, config, from_tag, from_branch)
+            except Exception as e:
+                raise ValueError(f"Failed to get version from source: {e}") from e
 
-    # Validate promotion is allowed
-    promotion_rule = config.data.validate_promotion(
-        from_branch=source_branch,
-        to_branch=to_branch,
-        require_auto_promote=False,
-    )
-
-    logger.info(f"Promotion validated: {promotion_rule.from_branch} → {promotion_rule.to_branch}")
-    logger.info(f"Found version {version} to promote")
-
-    _validate_target_version(gitops, to_branch, version)
-
-    if dry_run:
-        logger.info("🧪 Dry run mode: Skipping promotion.")
-        return
-
-    # Calculate promoted version
-    target_suffix = config.data.suffixes.get(to_branch, "")
-    promoted_version = Version(
-        major=version.major,
-        minor=version.minor,
-        patch=version.patch,
-        suffix=target_suffix if target_suffix else None,
-    )
-
-    logger.info(f"Promoting version {version} → {promoted_version}")
-
-    try:
-        # Use tag as source if available, otherwise use branch
-        merge_source = from_tag if from_tag else source_branch
-        use_source_tag = bool(from_tag)
-
-        metadata_hook = build_promotion_metadata_hook(
-            config=config,
-            source_branch=source_branch,
-            target_branch=to_branch,
-            gitops=gitops,
+        # Validate promotion is allowed
+        promotion_rule = config.data.validate_promotion(
+            from_branch=source_branch,
+            to_branch=to_branch,
+            require_auto_promote=False,
         )
 
-        gitops.auto_promote(
-            source_branch=merge_source,
-            target_branch=to_branch,
-            version=str(promoted_version),
-            source_version=str(version),
-            is_source_tag=use_source_tag,
-            post_merge_hook=metadata_hook,
-            prefer_source_paths=promotion_prefer_source_paths(config),
+        logger.info(
+            f"Promotion validated: {promotion_rule.from_branch} → {promotion_rule.to_branch}"
         )
+        logger.info(f"Found version {version} to promote")
+        summary.set("branches", f"{source_branch} -> {to_branch}")
 
-        logger.info(f"✅ Promotion completed successfully: {source_branch} → {to_branch}")
-        logger.info(f"Tagged {to_branch} with {promoted_version}")
+        _validate_target_version(gitops, to_branch, version)
 
-    except Exception as e:
-        raise ValueError(f"Failed to promote: {e}") from e
+        if dry_run:
+            logger.info("🧪 Dry run mode: Skipping promotion.")
+            summary.set("outcome", "dry-run")
+            return
+
+        # Calculate promoted version
+        target_suffix = config.data.suffixes.get(to_branch, "")
+        promoted_version = Version(
+            major=version.major,
+            minor=version.minor,
+            patch=version.patch,
+            suffix=target_suffix if target_suffix else None,
+        )
+        summary.set("version", f"{version} -> {promoted_version}")
+        logger.info(f"Promoting version {version} → {promoted_version}")
+
+    with log_group("Merge/tag"):
+        try:
+            # Use tag as source if available, otherwise use branch
+            merge_source = from_tag if from_tag else source_branch
+            use_source_tag = bool(from_tag)
+
+            metadata_hook = build_promotion_metadata_hook(
+                config=config,
+                source_branch=source_branch,
+                target_branch=to_branch,
+                gitops=gitops,
+            )
+
+            with status("Merging and tagging..."):
+                gitops.auto_promote(
+                    source_branch=merge_source,
+                    target_branch=to_branch,
+                    version=str(promoted_version),
+                    source_version=str(version),
+                    is_source_tag=use_source_tag,
+                    post_merge_hook=metadata_hook,
+                    prefer_source_paths=promotion_prefer_source_paths(config),
+                )
+
+            logger.info(f"✅ Promotion completed successfully: {source_branch} → {to_branch}")
+            logger.info(f"Tagged {to_branch} with {promoted_version}")
+
+        except Exception as e:
+            raise ValueError(f"Failed to promote: {e}") from e
 
 
 def _get_source_version(

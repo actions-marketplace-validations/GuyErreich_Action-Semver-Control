@@ -18,6 +18,31 @@ tasks:
       - pyproject.toml
       - uv.lock
 
+  audit:
+    desc: Audit locked dependencies with uv
+    cmds:
+      - uv audit --frozen
+
+  license-check:
+    desc: Verify SPDX license headers (SkyWalking Eyes; same as CI)
+    cmds:
+      - |
+        docker run --rm \
+          -v "$PWD:/github/workspace" \
+          -w /github/workspace \
+          apache/skywalking-eyes:0.8.0 \
+          header check -c .licenserc.yaml
+
+  license-fix:
+    desc: Apply missing SPDX license headers (SkyWalking Eyes)
+    cmds:
+      - |
+        docker run --rm \
+          -v "$PWD:/github/workspace" \
+          -w /github/workspace \
+          apache/skywalking-eyes:0.8.0 \
+          header fix -c .licenserc.yaml
+
   format:
     desc: Format code with ruff
     cmds:
@@ -42,7 +67,7 @@ tasks:
 
   all:
     desc: Run all checks
-    deps: [format, lint, type-check, test]
+    deps: [format, lint, type-check, test, audit]
 
   pre-commit:
     desc: Install and run pre-commit hooks (gitleaks, private-key scan)

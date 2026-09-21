@@ -18,3 +18,4 @@ Consumers should pin caller workflows at the floating major tag `v1` (for exampl
 
 - Require status check **`license-check`** on `dev` and `master` so merges (and thus Auto Semver) only happen after SPDX headers pass.
 - Annual copyright updates come from workflow **Copyright Year Update** (`copyright-year.yml`); merge that PR after `license-check` is green so the bump includes the year-touched files.
+- In PR titles and changelog bullets, write **v1 tag** or `` `v1` `` — never bare `@v1` outside YAML. GitHub autolinks `@v1` in release notes to the unrelated user [github.com/v1](https://github.com/v1). The floating git tag **`v1` stays** (consumers still pin `...@v1`).
