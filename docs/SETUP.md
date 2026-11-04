@@ -19,7 +19,8 @@ Action-Semver-Control is listed on the [GitHub Marketplace](https://github.com/m
 From your consumer repository:
 
 ```bash
-uvx --from git+https://github.com/GuyErreich/Action-Semver-Control auto-semver setup
+uv tool install auto-semver-control
+auto-semver setup
 ```
 
 The wizard will:
@@ -141,7 +142,13 @@ jobs:
 Start from [`src/auto_semver/setup/scaffolds/auto_semver_config.yml`](../src/auto_semver/setup/scaffolds/auto_semver_config.yml). Adjust:
 
 - `suffixes` — map your branch names (`dev`, `staging`, `master`, etc.)
-- `version_files` — files Action-Semver-Control may update directly (`version.txt`, `pyproject.toml`, JSON manifests such as `package.json` / Cursor `plugin.json`). Lines like `"version": "1.2.3",` (trailing comma) are supported. **`uv.lock` is not included** — after a version bump, run `uv lock` (or Dependabot) so the editable package version in the lockfile matches `pyproject.toml`.
+- `version_files` — files Action-Semver-Control may update directly (`version.txt`, `pyproject.toml`, JSON manifests such as `package.json` / Cursor `plugin.json`). Lines like `"version": "1.2.3",` (trailing comma) are supported.
+- `lock_sync` — after rewriting `version_files`, refresh known package lockfiles that already exist at the repo root. When the runner has `uv` and `uv.lock` is present, the CLI runs that `uv lock`. When the runner has `npm` and `package-lock.json` is present, it runs that `npm install --package-lock-only`. Install the tool in a step before this action when the release commit should be a real re-lock. With neither tool installed, only the project version inside the existing lock changes (`1.8.5-dev` becomes `1.8.5.dev0` in `uv.lock`). The uv that installs the action is private and is not the CLI that rewrites your lock. Defaults to enabled with auto-detect. Options:
+  - `enabled: false` — never run (opt-out is config, not a separate workflow step: a later Action cannot join the same release commit this action creates)
+  - `ecosystems: [uv]` — allow-list (monorepos: sync only the ecosystems you own; omit to auto-detect all known lockfiles present)
+  - Never invents a lockfile that is not already present. A non-zero host lock command fails the bump. A missing CLI does not: the version string is patched and the rest of the lock stays byte-for-byte. An old `on_missing` key in config is ignored.
+  - New ecosystems: subclass `LockStrategy`, register on the default registry (see `src/auto_semver/lock_sync/strategies/`). `command()` is what the runner executes; `patch()` is the fallback.
+  - Frozen installs (`uv sync --frozen` / `uv lock --check`) fail if the lock is stale relative to `pyproject.toml` after a manual edit — run `uv lock` (or Dependabot) before promoting to staging/production.
 - `promotions` — which channels auto-promote
 - `commit_groups` — changelog grouping; use `summary_mode: header_only` to avoid noisy squash bodies (see README)
 - `release.strategy` — `single` (default) or `multi` for multiple open release PRs
@@ -195,7 +202,8 @@ See **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** for version regressio
 Set `GH_APP_CLIENT_ID` (repository variable) and `GH_APP_PRIVATE_KEY` (secret). Re-run setup:
 
 ```bash
-uvx --from git+https://github.com/GuyErreich/Action-Semver-Control auto-semver setup
+uv tool install auto-semver-control
+auto-semver setup
 ```
 
 ### `create-github-app-token` fails
@@ -216,7 +224,7 @@ Reusable bump/promote workflows default **`signed-commits: true`**, which create
 - **Fallback ([#286](https://github.com/GuyErreich/Action-Semver-Control/issues/286)):** Git Database REST (`blob` → `tree` with explicit `100644` / `100755` / `120000` → `commit` → `ref`) when the change includes executables, symlinks, or a destination↔source **mode** change GraphQL cannot apply. Author/committer/signature are omitted so GitHub App-signs the commit; ASC refuses to move the branch unless `verification.verified` is true.
 
 - Use a **GitHub App** installation token (not `GITHUB_TOKEN` alone).
-- The Docker action input `signed-commits` still defaults to `false` for backward compatibility when you call `uses: GuyErreich/Action-Semver-Control@v1` directly — pass `signed-commits: true` (or use the reusable workflows).
+- The action input `signed-commits` still defaults to `false` for backward compatibility when you call `uses: GuyErreich/Action-Semver-Control@v1` directly — pass `signed-commits: true` (or use the reusable workflows).
 - Opt out in a reusable caller with `signed-commits: false` only if you do not need verified signatures.
 
 If merges still fail with **Cannot update this protected ref** / **Commits must have verified signatures**, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#merging-is-blocked--commits-must-have-verified-signatures).
@@ -241,6 +249,30 @@ Auto Semver Bump runs only after a PR is merged. Requiring `license-check` on th
 Configure under **Settings → Rules → Rulesets** (or classic branch protection): require status check **`license-check`**.
 
 The **Copyright Year Update** workflow (`copyright-year.yml`) opens a PR to `dev` each New Year; merge it only after `license-check` is green.
+
+#### Why license-check uses Docker (SHA pinning)
+
+This repository keeps **Settings → Actions → SHA pinning required** on for Marketplace/OSS supply-chain hardening. GitHub enforces that policy on **every** resolved `uses:` in the job graph, including nested actions inside third-party composites. There is no “trust the parent SHA” escape hatch.
+
+[`apache/skywalking-eyes`](https://github.com/apache/skywalking-eyes) is a composite that still pins nested actions by tag (`actions/setup-go@v5` in the 0.8.0 tree; still `@v6` on upstream main). We cannot change Apache’s action, so CI runs the same checker via **digest-pinned Docker** instead of `uses:`:
+
+```bash
+docker run --rm -v "$PWD:/github/workspace" -w /github/workspace \
+  apache/skywalking-eyes:0.8.0@sha256:dd138eb0277407ecfcf0beebf2157c5fa092413a2c4041c162e1df87bd3716e8 \
+  header check -c .licenserc.yaml
+```
+
+Local parity: `task license-check` / `task license-fix` use the same image pin.
+
+**Do not** turn off repo-wide SHA pinning just to keep one composite — that weakens every workflow. Stay on Docker until upstream SHA-pins nested `uses:`; then reconsider switching back. Policy background: [#263](https://github.com/GuyErreich/Action-Semver-Control/issues/263).
+
+Refresh the multi-arch **index** digest when bumping the image tag:
+
+```bash
+docker buildx imagetools inspect apache/skywalking-eyes:0.8.0
+```
+
+**Nested-tag audit (this repo):** third-party workflow `uses:` are JS/Node actions already SHA-pinned (`actions/checkout`, `astral-sh/setup-uv`, `actions/cache`, `gitleaks/gitleaks-action`). Local composite `app-authentication` nests `actions/create-github-app-token` at a full SHA. Local composites `gh-release` and `preflight-app-secrets` are shell-only. No other third-party composite with nested tag pins remains.
 
 ## Architecture
 

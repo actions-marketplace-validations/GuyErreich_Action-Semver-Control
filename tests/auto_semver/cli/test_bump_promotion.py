@@ -20,6 +20,7 @@ from auto_semver.config import (
     CommitGroupsConfig,
     Config,
     ConfigData,
+    LockSyncConfig,
     PromotionRule,
     PullRequestConfig,
 )
@@ -196,6 +197,7 @@ class TestPromotionWorkflow:
         mock.get_open_release_version.return_value = None
         mock.fetch.return_value = None
         mock.get_recent_commits.return_value = ["feat: promotion feature"]
+        mock.repo = mocker.Mock(working_tree_dir=".")
         return mock
 
     @pytest.fixture
@@ -217,6 +219,7 @@ class TestPromotionWorkflow:
             changelog=ChangelogConfig(
                 file=Path("CHANGELOG.md"), truncate=False, template="## [{{version}}] - {{date}}\n"
             ),
+            lock_sync=LockSyncConfig(enabled=False),
         )
 
         # Generate the config file using the clean API (uses default path)

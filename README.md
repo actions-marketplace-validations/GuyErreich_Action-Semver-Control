@@ -3,7 +3,7 @@
 A custom GitHub Action written in Python to automatically bump semantic versioning, update changelogs, and create Pull Requests — fully configurable.
 
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Auto%20Semver%20Bumper-blue?logo=github)](https://github.com/marketplace/actions/auto-semver-bumper)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Pin major v1 tag](https://img.shields.io/badge/pin-v1-green)](docs/SETUP.md#pinning-policy)
 [![CI](https://github.com/GuyErreich/Action-Semver-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/GuyErreich/Action-Semver-Control/actions/workflows/ci.yml)
@@ -25,12 +25,13 @@ See [Pinning policy](docs/SETUP.md#pinning-policy) for the floating `v1` tag vs 
 
 **Required:** Caller workflows must include a [concurrency queue](docs/SETUP.md#concurrent-merges--bump-queue) when merging multiple PRs to the same branch.
 
-### One-command setup (recommended)
+### Install the package (recommended)
 
 From your consumer repository:
 
 ```bash
-uvx --from git+https://github.com/GuyErreich/Action-Semver-Control auto-semver setup
+uv tool install auto-semver-control
+auto-semver setup
 ```
 
 ### Add workflows without the CLI
@@ -54,14 +55,23 @@ Pin reusable workflows at the floating major tag `v1` (for example `.../semver-b
 - Auto-close old release PRs (single branch mode)
 - Label bump PRs automatically (`semver-bump`)
 - 100% typed Python (>=3.12)
-- No subprocess — uses GitPython and Requests libraries only
-- Fully Dockerized for clean CI/CD usage
+- No subprocess for git — uses GitPython and Requests; bump/promote refresh lockfiles with the `uv` or `npm` already on the runner when `lock_sync` is enabled, and otherwise update only the project version inside the existing lock
+- Published on PyPI as `auto-semver-control`. The console script stays `auto-semver`. The action installs that release when it exists, and this checkout until the first publish
 - Comprehensive test coverage with pytest and pyfakefs
 - Modern Python tooling (ruff, mypy, pre-commit, gitleaks secret scan)
 
 ## CLI Usage
 
-The action is primarily designed to run in CI/CD, but the CLI can be used for manual operations.
+The action installs `auto-semver-control` for this checkout's version when that release is on PyPI. Install the stable package locally as shown in [Install the package](#install-the-package-recommended).
+
+To try a dev or staging publish before it is production, install that pre-release explicitly:
+
+```bash
+uv tool install --prerelease explicit "auto-semver-control==1.2.3.dev0"
+uv tool install --prerelease explicit "auto-semver-control==1.2.3rc0"
+```
+
+`1.2.3-dev` is published as `1.2.3.dev0`, and `1.2.3-rc` as `1.2.3rc0`. A plain `uv tool install auto-semver-control` stays on the stable release. The PyPI name `auto-semver` is a different project.
 
 ### Manual Promotion
 To manually promote a version from one branch to another (e.g., `dev` -> `staging`):
@@ -161,4 +171,4 @@ commit_groups:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+GPL-3.0-or-later — see [LICENSE](LICENSE).

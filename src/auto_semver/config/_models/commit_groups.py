@@ -10,6 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from auto_semver.compat.commit_groups_list import accept_legacy_commit_groups_list
 from auto_semver.config._models.commit_group import CommitGroupConfig
 
 DEFAULT_IGNORE_LINE_PATTERNS: list[str] = [
@@ -50,11 +51,11 @@ class CommitGroupsConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, value: object | None) -> CommitGroupsConfig:
-        """Parse commit_groups from legacy list or structured dict YAML."""
+        """Parse commit_groups from a legacy list or a structured mapping."""
         if value is None:
             return cls()
         if isinstance(value, list):
-            return cls(groups=value)
+            return cls(groups=accept_legacy_commit_groups_list(value))
         if isinstance(value, dict):
             groups = value.get("groups", [])
             settings = {k: v for k, v in value.items() if k != "groups"}

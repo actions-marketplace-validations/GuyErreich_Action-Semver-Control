@@ -2,7 +2,7 @@
 
 GitHub is rolling out **stateless** installation tokens for GitHub Apps. New tokens use the `ghs_` prefix with a JWT payload (~520 characters, two dots after the prefix). Classic **stateful** tokens remain shorter opaque strings with no dots.
 
-Action-Semver-Control treats installation tokens as **opaque strings** — no hardcoded length or format assumptions in application code. Workflows pass tokens to `gh`, git HTTPS remotes, PyGithub, and the Docker action unchanged.
+Action-Semver-Control treats installation tokens as **opaque strings** — no hardcoded length or format assumptions in application code. Workflows pass tokens to `gh`, git HTTPS remotes, PyGithub, and the action unchanged.
 
 ## Audit summary
 

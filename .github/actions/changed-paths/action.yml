@@ -1,0 +1,45 @@
+# Copyright (c) 2025-2026 Guy Erreich
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Changed Paths
+description: Report whether the pull request diff touches any of the given path patterns
+
+inputs:
+  patterns:
+    description: Newline-separated glob patterns matched against every file in the pull request diff
+    required: true
+  token:
+    description: Token used to read the pull request file list
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  matched:
+    description: "'true' when at least one changed file matches a pattern, otherwise 'false'"
+    value: ${{ steps.match.outputs.matched }}
+
+runs:
+  using: composite
+  steps:
+    - id: match
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PATTERNS: ${{ inputs.patterns }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        # Outside a pull request (workflow_dispatch, push) there is no diff to
+        # narrow against, so the caller runs everything.
+        if [[ -z "${PR_NUMBER}" ]]; then
+          echo "::group::Changed paths"
+          echo "Not a pull request. There is no diff to narrow against, so this matches."
+          echo "Downstream steps will run."
+          echo "::endgroup::"
+          echo "::notice title=Changed paths::Not a pull request. There is no diff to narrow against, so this matches. Downstream steps will run."
+          echo "matched=true" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+        gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' \
+          | python3 "${GITHUB_ACTION_PATH}/match_paths.py"

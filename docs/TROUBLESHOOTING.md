@@ -103,7 +103,7 @@ Major bumps always reset to `X.0.0`.
 
 **Executable / symlink / mode changes:** GraphQL FileAdditions always land as `100644`. ASC routes those trees through the REST Git Data fallback and requires `verification.verified` before moving the branch. If REST signing fails, promote aborts rather than landing an unsigned or wrong-mode tip.
 
-**Do not reset/rebase staging to dev** to promote — that rewrites history. Merge-based promotion preserves the git graph.
+**Do not reset/rebase staging to dev** to promote — that rewrites history. Promotion keeps the target branch graph (fast-forward when possible, otherwise a one-parent squash). The resulting **tree** matches the source tag except ASC-managed metadata (`.semver.lock`, changelog, `version_files`). Paths removed or renamed on the source tag are deleted on the target; leftover source-deleted files are a promote bug, not a consumer lint quirk.
 
 ## Release notes show the wrong group (Other Changes)
 

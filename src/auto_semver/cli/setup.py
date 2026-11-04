@@ -9,6 +9,7 @@ import logging
 import webbrowser
 from pathlib import Path
 
+from auto_semver.compat.app_id import resolve_client_id
 from auto_semver.setup.links import (
     SETUP_DOC_URL,
     app_registration_url,
@@ -46,7 +47,7 @@ def run(
         owner: GitHub repository owner (defaults to origin remote).
         repo: GitHub repository name (defaults to origin remote).
         default_branch: Base branch for deep links and scaffolding context.
-        app_id: Deprecated alias for client_id (kept for CLI compatibility).
+        app_id: Deprecated alias for client_id. Removed in 2.0.
         client_id: GitHub App Client ID (preferred; from app settings).
         private_key_path: Path to the App private key PEM file.
         dry_run: Print actions without writing secrets or files.
@@ -75,7 +76,9 @@ def run(
 
     if not skip_secrets:
         verify_gh_authenticated()
-        resolved_client_id = (client_id or app_id or _prompt("GitHub App Client ID")).strip()
+        resolved_client_id = (
+            resolve_client_id(client_id=client_id, app_id=app_id) or _prompt("GitHub App Client ID")
+        ).strip()
         key_path = private_key_path or Path(_prompt("Path to private key .pem file"))
         private_key = key_path.read_text(encoding="utf-8")
         set_repo_variable(

@@ -616,14 +616,14 @@ class TestSignedGitOps:
     def test_publish_local_tip_once_uses_single_graphql_commit(
         self, mocker: MockerFixture, mock_repo: Any, tmp_path: Any
     ) -> None:
-        """Local-only tip with file changes becomes one createCommitOnBranch."""
+        """Local-only tip publishes additions and deletions in one GraphQL commit."""
         mock_repo.working_tree_dir = str(tmp_path)
         (tmp_path / "version.txt").write_text("1.0.0-rc\n", encoding="utf-8")
         mock_repo.head.commit.hexsha = "local-tip"
 
         def diff_side_effect(*args: str, **_kwargs: Any) -> str:
             if "--diff-filter=D" in args:
-                return ""
+                return "gone.txt\n"
             if "--diff-filter=ACMR" in args:
                 return "version.txt\n"
             return "version.txt\n"
@@ -632,6 +632,7 @@ class TestSignedGitOps:
 
         gitops = GitOps(signed_commits=True, github_token="token")
         mocker.patch.object(gitops, "_remote_has_commit", return_value=False)
+        mocker.patch.object(gitops, "_tree_diff_requires_rest", return_value=False)
         mock_gql = mocker.patch.object(
             gitops,
             "_graphql_create_commit_on_branch",
@@ -656,6 +657,7 @@ class TestSignedGitOps:
         assert kwargs["branch_name"] == "staging"
         assert kwargs["expected_head_oid"] == "base-sha"
         assert kwargs["additions"][0]["path"] == "version.txt"
+        assert kwargs["deletions"] == [{"path": "gone.txt"}]
 
     @pytest.mark.unit
     def test_publish_local_tip_once_fast_forwards_existing_remote_commit(
@@ -695,20 +697,17 @@ class TestSignedGitOps:
         base_ref.object.sha = "basesha"
         mock_gh_repo.get_git_ref.return_value = base_ref
 
-        file_change = mocker.MagicMock()
-        file_change.filename = "version.txt"
-        file_change.status = "modified"
-        file_change.previous_filename = None
-        comparison = mocker.MagicMock()
-        comparison.files = [file_change]
-        mock_gh_repo.compare.return_value = comparison
-
         content_file = mocker.MagicMock()
         content_file.decoded_content = b"1.0.0-rc\n"
         mock_gh_repo.get_contents.return_value = content_file
 
         mocker.patch.object(gitops, "_gh_repo", return_value=mock_gh_repo)
         mocker.patch.object(gitops, "_resolve_ref_sha", return_value="headsha")
+        mocker.patch.object(
+            gitops,
+            "_diff_paths_between",
+            return_value=(["version.txt"], ["gone.txt", "old_name.txt"]),
+        )
         mock_gql = mocker.patch.object(
             gitops,
             "_graphql_create_commit_on_branch",
@@ -728,4 +727,6 @@ class TestSignedGitOps:
         assert kwargs["expected_head_oid"] == "basesha"
         assert kwargs["additions"][0]["path"] == "version.txt"
         assert kwargs["additions"][0]["contents"] == base64.b64encode(b"1.0.0-rc\n").decode("ascii")
+        assert kwargs["deletions"] == [{"path": "gone.txt"}, {"path": "old_name.txt"}]
+        mock_gh_repo.compare.assert_not_called()
         mock_gh_repo.create_git_commit.assert_not_called()

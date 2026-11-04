@@ -20,6 +20,16 @@ promotions:
 version_files:
   - "version.txt"
 
+# lock_sync defaults to enabled + auto-detect when this block is omitted.
+# The runner's uv/npm rewrites the lock. If that tool is not installed, only the
+# project version inside the existing lock changes. Opt out:
+# lock_sync:
+#   enabled: false
+# Or restrict ecosystems (omit the list to auto-detect):
+# lock_sync:
+#   ecosystems:
+#     - uv
+
 release:
   strategy: single
   branch_prefix: auto-semver/release/

@@ -10,6 +10,7 @@ import pytest
 from pyfakefs.fake_filesystem import FakeFilesystem
 from pytest_mock import MockerFixture
 
+from auto_semver.compat._notice import reset_deprecation_warnings
 from tests.fixtures.changelog_fixture import ChangelogFixture
 from tests.fixtures.config_fixture import ConfigFixture
 from tests.fixtures.env_isolation_fixture import isolated_env
@@ -19,6 +20,12 @@ from tests.fixtures.github_api_mock_fixture import mock_github_api
 from tests.fixtures.github_event_fixture import GitHubEventFixture
 
 __all__ = ["isolated_env", "mock_github_api", "temp_git_repo"]
+
+
+@pytest.fixture(autouse=True)
+def reset_deprecation_warnings_between_tests() -> None:
+    """Let each test observe a deprecation warning on first use of an old name."""
+    reset_deprecation_warnings()
 
 
 @pytest.fixture

@@ -31,3 +31,9 @@ You should receive an acknowledgment within a few days. After a fix is available
 In scope: the GitHub Action, reusable workflows, and Python package in this repository.
 
 Out of scope: consumer repositories that *call* this action, third-party Actions we pin by SHA, and GitHub platform issues.
+
+## Actions supply chain
+
+This repository keeps **SHA pinning required** for GitHub Actions (`sha_pinning_required: true`). Top-level and nested `uses:` must resolve to full-length commit SHAs.
+
+Third-party composites that still pin nested actions by tag (today: `apache/skywalking-eyes` → `actions/setup-go@…`) cannot be invoked via `uses:` under that policy. License header checks therefore run the checker in a **digest-pinned container** (`apache/skywalking-eyes:…@sha256:…`) rather than as a nested Action. See [docs/SETUP.md](docs/SETUP.md#why-license-check-uses-docker-sha-pinning) and [#263](https://github.com/GuyErreich/Action-Semver-Control/issues/263).

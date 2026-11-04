@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from auto_semver.cli.utils import apply_promotion_metadata
 from auto_semver.config import Config
@@ -58,9 +59,10 @@ def _setup_promotion_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 @pytest.mark.unit
 def test_apply_promotion_metadata_updates_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """Promotion should rewrite changelog, version files, and lock for the target channel."""
+    mock_sync = mocker.patch("auto_semver.cli.utils.sync_package_locks", return_value=[])
     config = _setup_promotion_fixture(tmp_path, monkeypatch)
     changelog = tmp_path / "CHANGELOG.md"
     version_file = tmp_path / "version.txt"
@@ -72,10 +74,12 @@ def test_apply_promotion_metadata_updates_files(
         target_version="1.4.6-rc",
         target_branch="staging",
         merge_sha="abc123",
+        repo_root=tmp_path,
     )
 
     assert "[1.4.6-rc]" in changelog.read_text(encoding="utf-8")
     assert version_file.read_text(encoding="utf-8").strip() == "1.4.6-rc"
+    mock_sync.assert_called_once_with(repo_root=tmp_path, config=config.data.lock_sync)
 
     lock = SemverLock.load_from_file()
     assert str(lock.version) == "1.4.6-rc"
@@ -97,12 +101,14 @@ def test_apply_promotion_metadata_updates_files(
 def test_apply_promotion_metadata_lock_matches_config_promotion_pair(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
     source_branch: str,
     target_branch: str,
     source_version: str,
     target_version: str,
 ) -> None:
     """Lock source/target must mirror promotions[].from_branch and to_branch from config."""
+    mocker.patch("auto_semver.cli.utils.sync_package_locks", return_value=[])
     config = _setup_promotion_fixture(tmp_path, monkeypatch)
 
     apply_promotion_metadata(
@@ -112,6 +118,7 @@ def test_apply_promotion_metadata_lock_matches_config_promotion_pair(
         target_version=target_version,
         target_branch=target_branch,
         merge_sha="abc123",
+        repo_root=tmp_path,
     )
 
     lock = SemverLock.load_from_file()

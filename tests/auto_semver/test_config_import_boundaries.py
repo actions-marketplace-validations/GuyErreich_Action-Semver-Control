@@ -30,6 +30,7 @@ _REQUIRED_EXPORTS = frozenset(
         "BumpConfig",
         "ChangelogConfig",
         "ChangelogTemplateVars",
+        "LockSyncConfig",
         "PromotionRule",
         "PullRequestConfig",
         "PullRequestTemplateVars",

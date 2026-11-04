@@ -106,7 +106,7 @@ def extract_prefix_before_delimiter(text: str, delimiter: str = ":") -> str:
         >>> extract_prefix_before_delimiter("no delimiter here")
         'other'
     """
-    return text.split(delimiter)[0].strip() if delimiter in text else "other"
+    return text.split(delimiter, maxsplit=1)[0].strip() if delimiter in text else "other"
 
 
 def truncate_commit(msg: str, length: int = 72) -> str:

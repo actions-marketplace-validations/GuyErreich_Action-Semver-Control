@@ -123,7 +123,7 @@ class TestRichRenderer:
         fake_live = mocker.MagicMock()
         view._live = fake_live
         printed: list[object] = []
-        mocker.patch.object(console, "print", side_effect=lambda r: printed.append(r))
+        mocker.patch.object(console, "print", side_effect=printed.append)
 
         view.close()
 

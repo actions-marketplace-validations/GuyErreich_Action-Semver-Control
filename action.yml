@@ -34,13 +34,61 @@ inputs:
     default: 'false'
 
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
-  args:
-    - ${{ inputs.action == 'promote' && 'promote' || '' }}
-    - ${{ inputs.action == 'promote' && inputs.to_branch != '' && format('--to-branch={0}', inputs.to_branch) || '' }}
-    - ${{ inputs.action == 'promote' && inputs.from_tag != '' && format('--from-tag={0}', inputs.from_tag) || '' }}
-    - ${{ inputs.action == 'promote' && inputs.dry_run == 'true' && '--dry-run' || '' }}
-    - --github-token=${{ inputs.github-token }}
-    - ${{ inputs.signed-commits == 'true' && '--signed-commits' || '' }}
-    - ${{ inputs.debug == 'true' && '--debug' || '' }}
+  using: composite
+  steps:
+    - name: Read uv pin
+      id: uv-pin
+      shell: bash
+      run: echo "version=$(tr -d '[:space:]' < "${GITHUB_ACTION_PATH}/.uv-version")" >> "${GITHUB_OUTPUT}"
+
+    - name: Install uv
+      id: uv
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      with:
+        version: ${{ steps.uv-pin.outputs.version }}
+        enable-cache: false
+      env:
+        UV_NO_MODIFY_PATH: "1"
+
+    - name: Install auto-semver
+      id: install
+      shell: bash
+      env:
+        UV_BIN: ${{ steps.uv.outputs.uv-path }}
+      run: |
+        set -euo pipefail
+        pkg="${GITHUB_ACTION_PATH}"
+        bin_dir="${RUNNER_TEMP}/auto-semver-bin"
+        UV_TOOL_BIN_DIR="${bin_dir}" UV_TOOL_DIR="${RUNNER_TEMP}/auto-semver-tools" \
+          "${UV_BIN}" tool install "${pkg}"
+        echo "bin=${bin_dir}/auto-semver" >> "${GITHUB_OUTPUT}"
+
+    - name: Run auto-semver
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        AUTO_SEMVER_BIN: ${{ steps.install.outputs.bin }}
+        AUTO_SEMVER_TOKEN: ${{ inputs.github-token }}
+        AUTO_SEMVER_ACTION: ${{ inputs.action }}
+        AUTO_SEMVER_TO_BRANCH: ${{ inputs.to_branch }}
+        AUTO_SEMVER_FROM_TAG: ${{ inputs.from_tag }}
+        AUTO_SEMVER_DRY_RUN: ${{ inputs.dry_run }}
+        AUTO_SEMVER_DEBUG: ${{ inputs.debug }}
+        AUTO_SEMVER_SIGNED: ${{ inputs.signed-commits }}
+      run: |
+        set -euo pipefail
+        bin="${AUTO_SEMVER_BIN}"
+        args=(--github-token "${AUTO_SEMVER_TOKEN}")
+        if [[ "${AUTO_SEMVER_DEBUG}" == "true" ]]; then
+          args+=(--debug)
+        fi
+        if [[ "${AUTO_SEMVER_SIGNED}" == "true" ]]; then
+          args+=(--signed-commits)
+        fi
+        if [[ "${AUTO_SEMVER_ACTION}" == "promote" ]]; then
+          args+=(promote --to-branch "${AUTO_SEMVER_TO_BRANCH}" --from-tag "${AUTO_SEMVER_FROM_TAG}")
+          if [[ "${AUTO_SEMVER_DRY_RUN}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+        fi
+        env -u UV_PROJECT_ENVIRONMENT -u UV_FROZEN -u UV_PYTHON_INSTALL_DIR "${bin}" "${args[@]}"

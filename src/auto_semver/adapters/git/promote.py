@@ -222,26 +222,26 @@ class GitPromote(GitOpsBase):
         """
         Create a single verified commit on ``base`` whose tree matches ``head``.
 
-        Uses GraphQL ``createCommitOnBranch`` with the file diff from
-        ``base...head`` so the resulting commit is GitHub-signed.
+        Uses GraphQL ``createCommitOnBranch`` with a two-dot ``git diff``
+        (``--no-renames``) between the branch tip and ``head`` so deletions and
+        rename old-paths are included. GitHub ``compare()`` is three-dot and
+        capped at 300 files, so it cannot be used for tree sync.
         """
         gh_repo = self._gh_repo()
         base_ref = gh_repo.get_git_ref(f"heads/{base}")
         base_sha = str(base_ref.object.sha)
         head_sha = self._resolve_ref_sha(head)
 
-        comparison = gh_repo.compare(base_sha, head_sha)
+        addition_paths, deletion_paths = self._diff_paths_between(
+            base_sha=base_sha, head_ref=head_sha
+        )
         additions: list[dict[str, str]] = []
-        deletions: list[dict[str, str]] = []
+        deletions: list[dict[str, str]] = [
+            {"path": self._normalize_repo_rel_path(path)} for path in deletion_paths
+        ]
 
-        for file in comparison.files or []:
-            path = self._normalize_repo_rel_path(file.filename)
-            status = (file.status or "").lower()
-            if status == "removed":
-                deletions.append({"path": path})
-                continue
-            if status == "renamed" and file.previous_filename:
-                deletions.append({"path": self._normalize_repo_rel_path(file.previous_filename)})
+        for rel_path in addition_paths:
+            path = self._normalize_repo_rel_path(rel_path)
             content_file = gh_repo.get_contents(path, ref=head_sha)
             if isinstance(content_file, list):
                 raise RuntimeError(f"Expected a file at {path}@{head_sha}, got a directory listing")
@@ -413,7 +413,6 @@ class GitPromote(GitOpsBase):
 
                 try:
                     post_merge_hook(src_v, version)
-
                     dirty_paths = self._collect_dirty_tracked_paths()
                     if dirty_paths:
                         logger.info(
@@ -455,9 +454,17 @@ class GitPromote(GitOpsBase):
     def _diff_paths_between(
         self, *, base_sha: str, head_ref: str = "HEAD"
     ) -> tuple[list[str], list[str]]:
-        """Return (additions/modifications, deletions) between two commits."""
-        added = self.repo.git.diff(base_sha, head_ref, "--name-only", "--diff-filter=ACMR")
-        deleted = self.repo.git.diff(base_sha, head_ref, "--name-only", "--diff-filter=D")
+        """
+        Return (additions/modifications, deletions) between two commits.
+
+        ``--no-renames`` so overlay publishes delete the old path of a move.
+        """
+        added = self.repo.git.diff(
+            base_sha, head_ref, "--no-renames", "--name-only", "--diff-filter=ACMR"
+        )
+        deleted = self.repo.git.diff(
+            base_sha, head_ref, "--no-renames", "--name-only", "--diff-filter=D"
+        )
         additions = [line.strip() for line in added.splitlines() if line.strip()]
         deletions = [line.strip() for line in deleted.splitlines() if line.strip()]
         return additions, deletions

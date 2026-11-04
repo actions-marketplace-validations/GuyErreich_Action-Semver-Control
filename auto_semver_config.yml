@@ -25,6 +25,11 @@ release:
 bump:
   mode: classic
 
+# Restrict lock sync to uv (this repo). Omit ecosystems to auto-detect all known locks.
+lock_sync:
+  ecosystems:
+    - uv
+
 # Commit grouping configuration for PR and changelog templates
 commit_groups:
   summary_mode: header_only
@@ -234,7 +239,7 @@ changelog:
   template: |
     ## [{{version}}] - {{date}}
     
-    {% for group in grouped_messages -%}
+    {% for group in commit_groups -%}
     {% if group.title != "Ignore" and group.commits -%}
     ### {{ group.title }}
     {% for commit in group.commits -%}
@@ -252,4 +257,4 @@ changelog:
   # Optional: Specify a custom changelog footer
   footer: |
     ## License
-    This project is licensed under the MIT License.
+    This project is licensed under the GPL-3.0-or-later License.

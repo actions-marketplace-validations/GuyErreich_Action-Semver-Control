@@ -47,7 +47,7 @@ jobs:
         git remote set-url origin https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git
 
     - name: Run Auto Semver Action
-      uses: ./  # Local Docker action
+      uses: ./  # Installs this package and runs auto-semver
       with:
         # target-branch: ${{ github.ref_name }}
         github-token: ${{ steps.app-token.outputs.token }}

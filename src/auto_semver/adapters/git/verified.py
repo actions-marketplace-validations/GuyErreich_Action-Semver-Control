@@ -79,11 +79,13 @@ class GitVerifiedCommits(GitOpsBase):
         """
         Return staged paths split into additions/modifications and deletions.
 
-        Uses ``git diff --cached --diff-filter`` so GraphQL ``createCommitOnBranch``
-        receives correct ``fileChanges.additions`` and ``fileChanges.deletions``.
+        Uses ``git diff --cached --no-renames --diff-filter`` so GraphQL
+        ``createCommitOnBranch`` receives correct ``fileChanges.additions`` and
+        ``fileChanges.deletions``. ``--no-renames`` turns moves into delete+add
+        so overlay publishes drop the old path.
         """
-        added = self.repo.git.diff("--cached", "--name-only", "--diff-filter=ACMR")
-        deleted = self.repo.git.diff("--cached", "--name-only", "--diff-filter=D")
+        added = self.repo.git.diff("--cached", "--no-renames", "--name-only", "--diff-filter=ACMR")
+        deleted = self.repo.git.diff("--cached", "--no-renames", "--name-only", "--diff-filter=D")
         additions = [line.strip() for line in added.splitlines() if line.strip()]
         deletions = [line.strip() for line in deleted.splitlines() if line.strip()]
         return additions, deletions

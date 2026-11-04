@@ -5,6 +5,7 @@
 
 import datetime
 import logging
+from pathlib import Path
 
 import yaml
 
@@ -18,6 +19,7 @@ from auto_semver.core.semver import Version
 from auto_semver.core.semver.lock import SemverLock
 from auto_semver.core.semver.updater import VersionFileUpdater
 from auto_semver.core.semver.version import BumpCounts
+from auto_semver.lock_sync.sync import sync_package_locks
 from runview import get_summary, log_group, status
 
 logger = logging.getLogger(__package__)
@@ -160,6 +162,73 @@ def _apply_version_bump(
     return None
 
 
+def _unpublished_notes_base(
+    *,
+    gitops: GitOps,
+    lockfile: SemverLock,
+    github_token: str,
+) -> str | None:
+    """Return an earlier baseline when the current version never shipped.
+
+    A finalized version with no GitHub Release did not publish. The next release
+    notes should include that version's changes, so the commit range starts at
+    the previous finalized baseline instead of the failed release merge.
+
+    Args:
+        gitops: Git operations handler.
+        lockfile: Lock loaded from the integration branch, before it is rewritten.
+        github_token: Token used to check for a GitHub Release.
+
+    Returns:
+        The earlier baseline SHA, or None when the current baseline should be used.
+    """
+    current_base = lockfile.target_base_sha
+    if lockfile.finalized is not True or not isinstance(current_base, str) or not current_base:
+        return None
+
+    version = str(lockfile.version)
+    try:
+        shipped = gitops.github_release_exists(tag=version, github_token=github_token)
+    except Exception as err:
+        logger.warning("Could not check GitHub release for %s: %s", version, err)
+        return None
+    if shipped:
+        return None
+
+    earlier = _previous_finalized_baseline(gitops=gitops, version=version)
+    if earlier is None or earlier == current_base:
+        return None
+
+    logger.info(
+        "Version %s has no GitHub release; including its changes in the next release notes",
+        version,
+    )
+    return earlier
+
+
+def _previous_finalized_baseline(*, gitops: GitOps, version: str) -> str | None:
+    """Return the baseline SHA of the finalized lock before ``version``.
+
+    Args:
+        gitops: Git operations handler.
+        version: Version whose own lock entries should be skipped.
+
+    Returns:
+        The previous finalized lock's ``target_base_sha``, or None when absent.
+    """
+    seen: set[str] = set()
+    for commit in gitops.repo.iter_commits(paths=SemverLock.path):
+        lock = gitops.get_lock_at_ref(commit.hexsha)
+        if lock is None or lock.finalized is not True or not lock.target_base_sha:
+            continue
+        lock_version = str(lock.version)
+        if lock_version == version or lock_version in seen:
+            continue
+        seen.add(lock_version)
+        return lock.target_base_sha
+    return None
+
+
 def _push_release_branch(
     *,
     gitops: GitOps,
@@ -207,7 +276,13 @@ def _supersede_old_releases_in_single_mode(
         )
 
 
-def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str) -> None:
+def run(
+    *,
+    gitops: GitOps,
+    event: GitHubEvent,
+    config: Config,
+    github_token: str,
+) -> None:
     """
     Run the bump workflow.
 
@@ -263,6 +338,11 @@ def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str
             target_branch=target_branch,
         )
         baseline_sha = lockfile.target_base_sha
+        notes_base_sha = _unpublished_notes_base(
+            gitops=gitops,
+            lockfile=lockfile,
+            github_token=github_token,
+        )
 
         if not is_tag_promotion:
             with status("Applying version bump..."):
@@ -291,6 +371,7 @@ def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str
             for path in files_to_update:
                 VersionFileUpdater(file_path=path, version=version).update()
 
+            repo_root = Path(gitops.repo.working_tree_dir or ".")
             release_branch_name = f"{release_cfg.branch_prefix.rstrip('/')}/{new_version}"
 
             lockfile.version = version
@@ -312,7 +393,9 @@ def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str
                     f"Skipping baseline check. Details: {e}"
                 )
 
-            latest_commit_sha = lockfile.target_base_sha or event.get_merged_commit_sha()
+            latest_commit_sha = (
+                notes_base_sha or lockfile.target_base_sha or event.get_merged_commit_sha()
+            )
 
             commit_messages = gitops.get_recent_commits(latest_commit_sha, config=config)
             changelog.update(
@@ -324,16 +407,64 @@ def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str
             lockfile.target_base_sha = event.get_merged_commit_sha()
             lockfile.save_to_file()
 
+            author = event.get_actor() if hasattr(event, "get_actor") else "auto-semver"
+            feature_count = bump_counts.feature_count if bump_counts else 0
+            fix_count = bump_counts.fix_count if bump_counts else 0
+            synced_locks = sync_package_locks(repo_root=repo_root, config=config.data.lock_sync)
+
+    _publish_release(
+        gitops=gitops,
+        config=config,
+        github_token=github_token,
+        new_version=new_version,
+        previous_version=previous_version_str,
+        release_branch_name=release_branch_name,
+        target_branch=target_branch,
+        files_to_update=list(files_to_update),
+        synced_locks=synced_locks,
+        changelog_path=str(changelog.path),
+        semver_lock_path=str(lockfile.path),
+        commit_messages=list(commit_messages),
+        feature_count=feature_count,
+        fix_count=fix_count,
+        author=author,
+        repository=repo_full_name,
+        release_strategy=release_cfg.strategy,
+    )
+
+
+def _publish_release(
+    *,
+    gitops: GitOps,
+    config: Config,
+    github_token: str,
+    new_version: str,
+    previous_version: str,
+    release_branch_name: str,
+    target_branch: str,
+    files_to_update: list[str],
+    synced_locks: list[str],
+    changelog_path: str,
+    semver_lock_path: str,
+    commit_messages: list[str],
+    feature_count: int,
+    fix_count: int,
+    author: str,
+    repository: str,
+    release_strategy: str,
+) -> None:
+    """Create the release branch, commit, push, and open the pull request."""
+    summary = get_summary()
     with log_group("Git commit/push"):
         with status("Creating release branch and pushing..."):
             gitops.create_branch(branch_name=release_branch_name, force=True)
-            gitops.add(files_to_update)
-            gitops.add([lockfile.path])
-            gitops.add([changelog.path])
+            gitops.add([*files_to_update, *synced_locks])
+            gitops.add([semver_lock_path])
+            gitops.add([changelog_path])
             gitops.commit(f"Release {new_version}", force=True)
             _push_release_branch(gitops=gitops, release_branch_name=release_branch_name)
 
-        if release_cfg.strategy == "single":
+        if release_strategy == "single":
             _supersede_old_releases_in_single_mode(
                 gitops=gitops,
                 config=config,
@@ -355,18 +486,18 @@ def run(*, gitops: GitOps, event: GitHubEvent, config: Config, github_token: str
 
         pr_variables = GitHubPRTemplateVariables(
             version=new_version,
-            previous_version=previous_version_str,
+            previous_version=previous_version,
             commit_groups=commit_groups_data or [],
             breaking_changes=[],
-            author=event.get_actor() if hasattr(event, "get_actor") else "auto-semver",
-            repository=repo_full_name,
+            author=author,
+            repository=repository,
             date=release_date,
             branch=release_branch_name,
             base_branch=target_branch,
             labels=config.data.pull_request.labels,
             groups=commit_groups_data,
-            feature_count=bump_counts.feature_count if bump_counts else 0,
-            fix_count=bump_counts.fix_count if bump_counts else 0,
+            feature_count=feature_count,
+            fix_count=fix_count,
         )
 
         pr_builder = GitHubPRBuilder(

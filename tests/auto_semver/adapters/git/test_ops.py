@@ -561,3 +561,29 @@ class TestGitOps:
         mock_repo.head.set_commit.assert_called_once()
         mock_repo.git.reset.assert_called_once_with("--hard", "squash-sha")
         mock_repo.git.merge.assert_called_once_with("1.4.6-dev", ff_only=True)
+
+    @pytest.mark.unit
+    def test_diff_paths_between_treats_rename_as_delete_and_add(self, tmp_path: Path) -> None:
+        """Two-dot ``--no-renames`` must list the old path as deleted."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        repo = Repo.init(repo_dir)
+        repo.config_writer().set_value("user", "name", "Test").release()
+        repo.config_writer().set_value("user", "email", "test@example.com").release()
+        (repo_dir / "gone.txt").write_text("drop-me\n", encoding="utf-8")
+        (repo_dir / "old_name.txt").write_text("same-payload\n", encoding="utf-8")
+        (repo_dir / "keep.txt").write_text("keep\n", encoding="utf-8")
+        repo.index.add(["gone.txt", "old_name.txt", "keep.txt"])
+        base = repo.index.commit("base")
+        repo.git.rm("gone.txt")
+        repo.git.mv("old_name.txt", "new_name.txt")
+        repo.index.commit("delete and rename")
+
+        gitops = GitOps(repo_path=str(repo_dir))
+        additions, deletions = gitops._diff_paths_between(base_sha=base.hexsha, head_ref="HEAD")
+
+        assert "gone.txt" in deletions
+        assert "old_name.txt" in deletions
+        assert "new_name.txt" in additions
+        assert "keep.txt" not in additions
+        assert "keep.txt" not in deletions

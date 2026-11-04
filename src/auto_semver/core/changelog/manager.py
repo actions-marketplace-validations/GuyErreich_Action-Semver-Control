@@ -21,6 +21,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from auto_semver.compat.grouped_messages import apply_grouped_messages_alias
 from auto_semver.config import Config
 from auto_semver.core.commits.grouper import CommitGrouper
 from auto_semver.templates.engine import get_template_engine
@@ -136,11 +137,7 @@ class ChangelogManager:
             raise ValueError(f"Missing required template variables: {missing_vars}")
 
         try:
-            # Add backward compatibility alias for grouped_messages
-            enhanced_vars = template_vars.copy()
-            if "commit_groups" in enhanced_vars and "grouped_messages" not in enhanced_vars:
-                enhanced_vars["grouped_messages"] = enhanced_vars["commit_groups"]
-
+            enhanced_vars = apply_grouped_messages_alias(self.template, template_vars)
             return self._engine.render_template(self.template, enhanced_vars)
         except Exception as e:
             logger.error(f"Failed to render changelog template: {e}")
@@ -184,12 +181,10 @@ class ChangelogManager:
             "messages": messages,
         }
 
-        # Add both canonical and legacy names for commit groups
         if grouped_data is not None:
             template_vars["commit_groups"] = grouped_data
-            template_vars["grouped_messages"] = grouped_data  # backward compatibility
+        template_vars = apply_grouped_messages_alias(self.template, template_vars)
 
-        # Use manager's template engine with registered functions
         rendered = self._engine.render_template(self.template, template_vars)
 
         # Compose updated content

@@ -3,8 +3,8 @@ version: "1.0"
 
 # Default settings for worktrees
 defaults:
-  # Base directory for worktrees (relative to repository root)
-  base_dir: "/home/opsxe/Development/worktrees/Github Actions/action-semver-by-branch"
+  # Absolute path. wtp does not expand ~ or $HOME; non-absolute values are joined to the repo root.
+  base_dir: "/home/opsxe/Development/worktrees/Action-Semver-Control"
 
 # Hooks that run after creating a worktree
 hooks:
@@ -18,7 +18,3 @@ hooks:
     # Example: Run a command to show all worktrees
     - type: command
       command: wtp list
-
-    - type: copy
-      from: ..github/copilot/    # Cursor IDE settings
-      to: .github/copilot/

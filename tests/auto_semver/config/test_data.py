@@ -271,3 +271,27 @@ class TestConfigData:
                 ],
             )
             Config(path=config_fixture.config_path)  # Should fail during validation
+
+    @pytest.mark.unit
+    def test_lock_sync_defaults_and_allow_list(self, config_fixture: ConfigFixture) -> None:
+        """lock_sync defaults to enabled auto-detect; allow-list parses from YAML."""
+        config_fixture.create(
+            start_version="0.1.0",
+            suffixes={"main": ""},
+            version_files=["version.txt"],
+            promotions=[],
+        )
+        default_config = Config(path=config_fixture.config_path)
+        assert default_config.data.lock_sync.enabled is True
+        assert default_config.data.lock_sync.ecosystems is None
+
+        config_fixture.create(
+            start_version="0.1.0",
+            suffixes={"main": ""},
+            version_files=["version.txt"],
+            promotions=[],
+            lock_sync={"enabled": True, "on_missing": "fail", "ecosystems": ["uv"]},
+        )
+        pinned = Config(path=config_fixture.config_path)
+        assert pinned.data.lock_sync.ecosystems == ["uv"]
+        assert not hasattr(pinned.data.lock_sync, "on_missing")

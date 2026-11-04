@@ -1,0 +1,41 @@
+# Copyright (c) 2025-2026 Guy Erreich
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Publish Release - Dev
+
+on:
+  push:
+    tags:
+      - '*.*.*-dev'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment: 'dev'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # Required to fetch tags
+          persist-credentials: false
+
+      - name: Get GitHub App Token
+        uses: ./.github/actions/app-authentication
+        id: app-token
+        with:
+          client-id: ${{ vars.GH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      # Publish before the GitHub release so a failed upload leaves no release.
+      - name: Publish package to PyPI
+        uses: ./.github/actions/publish-pypi
+
+      - name: GH Release
+        uses: ./.github/actions/gh-release
+        with:
+          github_token: ${{ steps.app-token.outputs.token }}

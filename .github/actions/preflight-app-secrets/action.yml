@@ -41,7 +41,8 @@ runs:
           printf '  - %s\n' "${missing[@]}"
           echo
           echo "Quick setup:"
-          echo "  uvx --from git+https://github.com/GuyErreich/Action-Semver-Control auto-semver setup"
+          echo "  uv tool install auto-semver-control"
+          echo "  auto-semver setup"
           echo "  ${SETUP_URL}"
           exit 1
         fi

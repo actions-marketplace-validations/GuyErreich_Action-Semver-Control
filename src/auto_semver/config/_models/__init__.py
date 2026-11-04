@@ -12,6 +12,7 @@ from auto_semver.config._models.commit_group import (
 )
 from auto_semver.config._models.commit_groups import CommitGroupsConfig
 from auto_semver.config._models.config import ConfigData
+from auto_semver.config._models.lock_sync import LockSyncConfig
 from auto_semver.config._models.promotion import BranchName, PromotionRule
 from auto_semver.config._models.pull_request import PullRequestConfig
 from auto_semver.config._models.release import ReleaseConfig
@@ -26,6 +27,7 @@ __all__ = [
     "CommitGroups",
     "CommitGroupsConfig",
     "ConfigData",
+    "LockSyncConfig",
     "PromotionRule",
     "PullRequestConfig",
     "RegexPattern",

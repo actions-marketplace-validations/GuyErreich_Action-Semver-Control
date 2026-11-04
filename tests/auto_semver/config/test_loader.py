@@ -5,6 +5,7 @@ This module tests the Config class interface without importing internal models,
 mimicking how users would interact with the system.
 """
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -133,8 +134,12 @@ changelog:
         assert changelog_config.template == "## [{{version}}] - {{date}}\n"
 
     @pytest.mark.unit
-    def test_changelog_legacy_grouped_messages_alias(self, config_fixture: ConfigFixture) -> None:
-        """Ensure templates using legacy 'grouped_messages' still render with commit_groups."""
+    def test_changelog_legacy_grouped_messages_alias(
+        self,
+        config_fixture: ConfigFixture,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Old grouped_messages templates still render and warn once."""
         config_fixture.create(
             commit_groups=[{"title": "Features", "patterns": ["^feat:"], "priority": 1}],
             changelog={
@@ -163,9 +168,16 @@ changelog:
         )
         # Use manager for rendering, not config model
         manager = ChangelogManager.from_config(config)
-        rendered = manager.render_template(vars.__dict__)
+        with caplog.at_level(logging.WARNING, logger="auto_semver.compat._notice"):
+            rendered = manager.render_template(vars.__dict__)
+            rendered_again = manager.render_template(vars.__dict__)
         assert "Features" in rendered
         assert "add feature" in rendered
+        assert rendered_again == rendered
+        warnings = [
+            record for record in caplog.records if "grouped_messages is deprecated" in record.message
+        ]
+        assert len(warnings) == 1
 
     @pytest.mark.unit
     def test_config_promotions_interface(self, config_fixture: ConfigFixture) -> None:

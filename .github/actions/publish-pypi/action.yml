@@ -1,0 +1,41 @@
+# Copyright (c) 2025-2026 Guy Erreich
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Publish package to PyPI
+description: Build this checkout and publish it with trusted publishing.
+
+runs:
+  using: composite
+  steps:
+    - name: Read uv pin
+      id: uv-pin
+      shell: bash
+      run: echo "version=$(tr -d '[:space:]' < .uv-version)" >> "$GITHUB_OUTPUT"
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        version: ${{ steps.uv-pin.outputs.version }}
+        python-version: "3.12"
+
+    - name: Publish
+      shell: bash
+      run: |
+        set -euo pipefail
+        raw="$(python -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])")"
+        # 1.2.3-dev and 1.2.3-rc are not PEP 440. uv stores 1.2.3.dev0 and 1.2.3rc0.
+        uv version "$raw" --frozen
+        uv build
+        # A retry after a successful upload must still reach the GitHub release step.
+        set +e
+        publish_log="$(uv publish 2>&1)"
+        publish_status=$?
+        set -e
+        printf '%s\n' "$publish_log"
+        if [ "$publish_status" -ne 0 ]; then
+          if printf '%s\n' "$publish_log" | grep -q "File already exists"; then
+            echo "This version is already on PyPI; continuing to the GitHub release."
+          else
+            exit "$publish_status"
+          fi
+        fi

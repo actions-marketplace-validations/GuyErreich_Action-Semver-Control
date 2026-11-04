@@ -19,6 +19,7 @@ from auto_semver.adapters.git import GitOps
 from auto_semver.adapters.github import GitHubEvent
 from auto_semver.cli import bump, finalize, promote, setup
 from auto_semver.cli.utils import is_finalized
+from auto_semver.compat.app_id import add_app_id_alias
 from auto_semver.config import Config
 from auto_semver.setup.check import run_check
 from runview import Config as RunviewConfig
@@ -93,7 +94,7 @@ def _build_parser() -> argparse.ArgumentParser:
     setup_parser.add_argument("--repo", type=str, help="Repository name")
     setup_parser.add_argument("--default-branch", type=str, help="Default/base branch")
     setup_parser.add_argument("--client-id", type=str, help="GitHub App Client ID (preferred)")
-    setup_parser.add_argument("--app-id", type=str, help="Deprecated alias for --client-id")
+    add_app_id_alias(setup_parser)
     setup_parser.add_argument("--private-key", type=Path, help="Path to App private key PEM")
     setup_parser.add_argument("--dry-run", action="store_true", help="Print plan only")
     setup_parser.add_argument(
@@ -208,7 +209,12 @@ def _run_semver(args: argparse.Namespace) -> None:
         get_summary().set("command", "finalize")
         finalize.run(gitops=gitops, event=event, config=config, github_token=args.github_token)
     else:
-        bump.run(gitops=gitops, event=event, config=config, github_token=args.github_token)
+        bump.run(
+            gitops=gitops,
+            event=event,
+            config=config,
+            github_token=args.github_token,
+        )
     get_summary().set("outcome", "success")
 
 

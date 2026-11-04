@@ -33,9 +33,34 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__package__)
 
+_HTTP_NOT_FOUND = 404
+
 
 class GitReleasePr(GitOpsBase):
     """Release PR ownership and discovery."""
+
+    def github_release_exists(self, *, tag: str, github_token: str) -> bool:
+        """Return whether a GitHub Release exists for ``tag``.
+
+        Args:
+            tag: Tag name. GitHub uses that name as the release id.
+            github_token: Token used to query the GitHub API.
+
+        Returns:
+            True when the release exists. False when GitHub returns 404.
+
+        Raises:
+            GithubException: For API errors other than a missing release.
+        """
+        gh = self._github_client_for(github_token)
+        repo: Repository = gh.get_repo(full_name_or_id=self._repo_full_name)
+        try:
+            repo.get_release(tag)
+        except GithubException as err:
+            if err.status == _HTTP_NOT_FOUND:
+                return False
+            raise
+        return True
 
     def get_lock_at_ref(self, ref: str) -> SemverLock | None:
         """Load `.semver.lock` from a branch or tag ref."""

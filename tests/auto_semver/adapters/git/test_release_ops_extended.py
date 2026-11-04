@@ -36,7 +36,7 @@ def test_get_open_release_version_returns_highest(mocker: MockerFixture) -> None
     ).return_value.get_repo.return_value = mock_repo
 
     def lock_side_effect(ref: str) -> SemverLock | None:
-        version_str = ref.split("/")[-1]
+        version_str = ref.rsplit("/", maxsplit=1)[-1]
         return SemverLock(
             version=Version.parse(version_str),
             source_branch="feature/x",

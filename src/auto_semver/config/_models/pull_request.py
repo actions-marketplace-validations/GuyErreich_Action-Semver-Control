@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from jinja2 import TemplateSyntaxError
 from pydantic import BaseModel, Field, field_validator
 
+from auto_semver.compat.grouped_messages import apply_grouped_messages_alias
 from auto_semver.config._models.commit_group import CommitGroups
 from auto_semver.config.constants import PR_HIDDEN_MARKER
 from auto_semver.templates.engine import get_template_engine
@@ -154,8 +155,7 @@ class PullRequestConfig(BaseModel):
         }
         if variables.commit_groups is not None:
             template_vars["commit_groups"] = variables.commit_groups
-            # Provide legacy alias expected by older templates / configs
-            template_vars["grouped_messages"] = variables.commit_groups
+        template_vars = apply_grouped_messages_alias(self.body, template_vars)
         engine = get_template_engine()
         rendered = engine.render_template(self.body, template_vars)
         return f"{PR_HIDDEN_MARKER}\n{rendered}"

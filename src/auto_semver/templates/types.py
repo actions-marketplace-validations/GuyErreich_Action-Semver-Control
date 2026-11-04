@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 # Type aliases for template system
-type TemplateValue = str | int | float | bool | datetime | None | object
+type TemplateValue = str | int | float | bool | datetime | object | None
 type TemplateVariables = dict[str, TemplateValue]
 type DateLike = str | datetime
 type TemplateFunction = Callable[..., TemplateValue]

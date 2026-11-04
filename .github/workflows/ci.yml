@@ -5,6 +5,7 @@ name: CI
 
 permissions:
   contents: read
+  pull-requests: read
 
 on:
   pull_request:
@@ -13,6 +14,9 @@ on:
       - dev
 
 jobs:
+  # Rulesets require checks named "Python 3.12" and "Python 3.13". Those names
+  # exist only when this matrix runs, so the job itself is not skipped. Steps
+  # after the path check run only when a changed file matches.
   ci:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
@@ -25,14 +29,55 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+    - name: Detect Python-related changes
+      id: python
+      uses: ./.github/actions/changed-paths
+      with:
+        patterns: |
+          *.py
+          pyproject.toml
+          uv.lock
+          .python-version
+          .uv-version
+          Taskfile.yml
+          .github/workflows/ci.yml
+
+    - name: Report Python CI decision
+      env:
+        MATCHED: ${{ steps.python.outputs.matched }}
+        PYTHON_VERSION: ${{ matrix.python-version }}
+      run: |
+        set -euo pipefail
+        echo "::group::Python ${PYTHON_VERSION} CI"
+        if [[ "${MATCHED}" == "true" ]]; then
+          echo "Python-related files changed."
+          echo "Lint, type-check, and tests will run."
+          echo "::endgroup::"
+          echo "::notice title=Running Python ${PYTHON_VERSION}::Python-related files changed. Lint, type-check, and tests will run."
+        else
+          echo "No Python-related files changed."
+          echo "Lint, type-check, and tests are skipped."
+          echo "This check still succeeds so the required status is reported."
+          echo "::endgroup::"
+          echo "::warning title=Skipping Python ${PYTHON_VERSION}::No Python-related files changed. Lint, type-check, and tests are skipped. This check succeeds so the required status is reported."
+        fi
+
+    - name: Read uv pin
+      id: uv-pin
+      if: steps.python.outputs.matched == 'true'
+      run: echo "version=$(tr -d '[:space:]' < .uv-version)" >> "$GITHUB_OUTPUT"
+
     - name: Install uv
-      uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      if: steps.python.outputs.matched == 'true'
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       with:
         enable-cache: true
         cache-dependency-glob: "uv.lock"
         python-version: ${{ matrix.python-version }}
+        version: ${{ steps.uv-pin.outputs.version }}
 
     - name: Cache tool caches (mypy, ruff, pytest)
+      if: steps.python.outputs.matched == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -44,28 +89,36 @@ jobs:
           ${{ runner.os }}-tool-caches-${{ matrix.python-version }}-
 
     - name: Cache Task binary
+      if: steps.python.outputs.matched == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: /usr/local/bin/task
         key: ${{ runner.os }}-task-${{ hashFiles('install-task.sh') }}
 
     - name: Install Task (Go task runner)
+      if: steps.python.outputs.matched == 'true'
       run: ./install-task.sh
 
     - name: Install dependencies
+      if: steps.python.outputs.matched == 'true'
       run: task install
 
     - name: Dependency audit
+      if: steps.python.outputs.matched == 'true'
       run: task audit
 
     - name: Format code
+      if: steps.python.outputs.matched == 'true'
       run: task format
 
     - name: Lint code
+      if: steps.python.outputs.matched == 'true'
       run: task lint
 
     - name: Type check
+      if: steps.python.outputs.matched == 'true'
       run: task type-check
 
     - name: Run tests
+      if: steps.python.outputs.matched == 'true'
       run: task test

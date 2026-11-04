@@ -189,7 +189,10 @@ class TestMain:
 
         # Verify bump.run was called with correct arguments
         mock_bump.assert_called_once_with(
-            gitops=mock_gitops, event=event, config=mock_config, github_token=mock_args.github_token
+            gitops=mock_gitops,
+            event=event,
+            config=mock_config,
+            github_token=mock_args.github_token,
         )
 
         # Verify finalize.run was not called

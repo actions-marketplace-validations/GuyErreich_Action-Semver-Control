@@ -13,6 +13,7 @@ from auto_semver.config._models.bump import BumpConfig
 from auto_semver.config._models.changelog import ChangelogConfig
 from auto_semver.config._models.commit_group import CommitGroups
 from auto_semver.config._models.commit_groups import CommitGroupsConfig
+from auto_semver.config._models.lock_sync import LockSyncConfig
 from auto_semver.config._models.promotion import PromotionRule
 from auto_semver.config._models.pull_request import PullRequestConfig
 from auto_semver.config._models.release import ReleaseConfig
@@ -60,6 +61,10 @@ class ConfigData(BaseModel):
     bump: BumpConfig = Field(
         default_factory=BumpConfig,
         description="Version bump mode (classic semver vs cumulative)",
+    )
+    lock_sync: LockSyncConfig = Field(
+        default_factory=LockSyncConfig,
+        description="Package-manager lockfile sync after version-file rewrites",
     )
     pull_request: PullRequestConfig
     changelog: ChangelogConfig

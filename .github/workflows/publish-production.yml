@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     # Dynamically set environment based on branch
     environment: 'production'
 
@@ -32,6 +33,10 @@ jobs:
         with:
           client-id: ${{ vars.GH_APP_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      # Publish before the GitHub release so a failed upload leaves no release.
+      - name: Publish package to PyPI
+        uses: ./.github/actions/publish-pypi
 
       - name: GH Release
         uses: ./.github/actions/gh-release
